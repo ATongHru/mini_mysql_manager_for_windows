@@ -126,6 +126,6 @@ go build ./...
 
 ## 许可证
 
-本项目包含采用 MPL-2.0 的第三方 MySQL 驱动；其许可证声明和发布要求请参阅 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+本项目包含采用 MPL-2.0 的第三方 MySQL 驱动；其许可证声明和发布要求请参阅 [NOTICE](NOTICE)。
 
 本项目当前未附带顶层许可证文件。若计划公开复用、分发或接受贡献，请在发布前补充合适的开源许可证，并遵守 `third_party/mysql` 中第三方依赖的许可证要求。

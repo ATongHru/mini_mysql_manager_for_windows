@@ -1,0 +1,17 @@
+NOTICE
+======
+
+This project vendors the following third-party component:
+
+- Component: Go-MySQL-Driver (`github.com/go-sql-driver/mysql`), module version `v1.8.1`
+- Project: https://github.com/go-sql-driver/mysql
+- Bundled source: `third_party/mysql`
+- License: Mozilla Public License 2.0 (MPL-2.0)
+
+Original copyright notices and attribution are retained in the bundled source files and in `third_party/mysql/AUTHORS`, including notices in the form:
+
+    Copyright 2012 The Go-MySQL-Driver Authors. All rights reserved.
+
+The original, complete MPL-2.0 license text is retained unchanged at `third_party/mysql/LICENSE` and must accompany distributions as required by MPL-2.0.
+
+If you modify MPL-2.0-covered files under `third_party/mysql` and distribute those files or executable forms containing them, comply with the MPL-2.0 source-availability and notice requirements. This NOTICE is an attribution summary; the complete license text controls.
