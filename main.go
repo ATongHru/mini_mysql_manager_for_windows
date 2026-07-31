@@ -749,7 +749,10 @@ func buildFilters(q url.Values, meta tableMeta) (string, []any, error) {
 		}
 	}
 	if len(parts) == 0 { return "", nil, nil }
-	return " WHERE "+strings.Join(parts, " AND "), args, nil
+	logic := strings.ToUpper(strings.TrimSpace(q.Get("filterLogic")))
+	if logic == "" { logic = "AND" }
+	if logic != "AND" && logic != "OR" { return "", nil, errors.New("筛选条件关系无效") }
+	return " WHERE "+strings.Join(parts, " "+logic+" "), args, nil
 }
 func appendWhere(where, condition string) string {
 	if condition == "" { return where }
