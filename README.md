@@ -2,7 +2,7 @@
 
 一个使用 Go 开发、可在 Windows 上直接运行的轻量级 MySQL 管理服务。程序启动后提供本地 Web 管理界面，支持登录 MySQL、浏览数据库和表、快捷筛选与 SQL 查询、记录编辑和删除，以及 SQL 导入导出；无需安装 Node.js、PHP 或独立的 Web 服务器。
 
-> **安全说明：** 请妥善保护数据库账号与导出的业务数据，避免将敏感信息提交到公开仓库。
+> 
 
 ## 功能
 
@@ -47,14 +47,14 @@ MySQL 驱动源码已随项目放在 `third_party/mysql` 中；在依赖未变�
 
 所有选项都可通过命令行参数或环境变量设置；命令行参数适合临时使用，环境变量适合受控的本地自动化。
 
-| 作用 | 命令行参数 | 环境变量 | 默认值 |
-| --- | --- | --- | --- |
-| Web 监听地址 | `-addr` | `MYSQL_MANAGER_ADDR` | `127.0.0.1:8080` |
-| 初始 MySQL 主机 | `-mysql-host` | `MYSQL_HOST` | 空 |
-| 初始 MySQL 端口 | `-mysql-port` | `MYSQL_PORT` | `3306` |
-| 初始 MySQL 用户 | `-mysql-user` | `MYSQL_USER` | `root` |
-| 初始 MySQL 密码 | `-mysql-password` | `MYSQL_PASSWORD` | 空 |
-| 自动打开浏览器 | `-open-browser` | — | `true` |
+| 作用          | 命令行参数             | 环境变量                 | 默认值              |
+| ----------- | ----------------- | -------------------- | ---------------- |
+| Web 监听地址    | `-addr`           | `MYSQL_MANAGER_ADDR` | `127.0.0.1:8080` |
+| 初始 MySQL 主机 | `-mysql-host`     | `MYSQL_HOST`         | 空                |
+| 初始 MySQL 端口 | `-mysql-port`     | `MYSQL_PORT`         | `3306`           |
+| 初始 MySQL 用户 | `-mysql-user`     | `MYSQL_USER`         | `root`           |
+| 初始 MySQL 密码 | `-mysql-password` | `MYSQL_PASSWORD`     | 空                |
+| 自动打开浏览器     | `-open-browser`   | —                    | `true`           |
 
 示例：使用另一个本地端口启动，并手动连接数据库：
 
@@ -126,6 +126,12 @@ go build ./...
 
 ## 许可证
 
-本项目包含采用 MPL-2.0 的第三方 MySQL 驱动；其许可证声明和发布要求请参阅 [NOTICE](NOTICE)。
+本项目采用 [MIT License](LICENSE)，版权归 `ATongHru` 所有。
 
-本项目当前未附带顶层许可证文件。若计划公开复用、分发或接受贡献，请在发布前补充合适的开源许可证，并遵守 `third_party/mysql` 中第三方依赖的许可证要求。
+本项目包含 `github.com/go-sql-driver/mysql` 的源码副本。该组件及其原始版权声明继续受 MPL-2.0 约束：
+
+- 第三方依赖声明： [NOTICE](NOTICE)
+- 完整 MPL-2.0 文本： [LICENSE-MPL20](LICENSE-MPL20)
+- 随附源码中的原始许可证文本： [`third_party/mysql/LICENSE`](third_party/mysql/LICENSE)
+
+`third_party/mysql` 中原有的版权声明、作者列表和 MPL-2.0 许可证文本均已保留。
