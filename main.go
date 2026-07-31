@@ -492,6 +492,8 @@ func (s *server) exportSQL(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, err.Error())
 		return
 	}
+	filters, args, err := buildFilters(r.URL.Query(), meta)
+	if err != nil { writeError(w, 400, err.Error()); return }
 	db, err := s.currentDB()
 	if err != nil { writeError(w, 400, err.Error()); return }
 	includeData := r.URL.Query().Get("data") != "0"
@@ -508,7 +510,7 @@ func (s *server) exportSQL(w http.ResponseWriter, r *http.Request) {
 	if !includeData {
 		return
 	}
-	rows, err := db.Query("SELECT * FROM " + qualify(schema, table))
+	rows, err := db.Query("SELECT * FROM "+qualify(schema, table)+filters, args...)
 	if err != nil {
 		writeDBError(w, err)
 		return
