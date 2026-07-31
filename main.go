@@ -379,15 +379,18 @@ func (s *server) row(w http.ResponseWriter, r *http.Request) {
 	}
 	db, err := s.currentDB()
 	if err != nil { writeError(w, 400, err.Error()); return }
-	if len(meta.PrimaryKeys) == 0 {
-		writeError(w, 400, "该表没有主键，无法安全编辑或删除")
-		return
-	}
 	allowed := map[string]bool{}
 	for _, col := range meta.Columns {
 		allowed[col.Name] = true
 	}
-	where, whereArgs, err := primaryWhere(meta.PrimaryKeys, payload.PrimaryKey, allowed)
+	locatorKeys := meta.PrimaryKeys
+	if len(locatorKeys) == 0 {
+		locatorKeys = make([]string, 0, len(meta.Columns))
+		for _, col := range meta.Columns {
+			locatorKeys = append(locatorKeys, col.Name)
+		}
+	}
+	where, whereArgs, err := primaryWhere(locatorKeys, payload.PrimaryKey, allowed)
 	if err != nil {
 		writeError(w, 400, err.Error())
 		return
@@ -803,6 +806,10 @@ func primaryWhere(keys []string, provided map[string]any, allowed map[string]boo
 		}
 		if !allowed[key] {
 			return "", nil, errors.New("主键字段无效")
+		}
+		if value == nil {
+			parts = append(parts, quoteIdentifier(key)+" IS NULL")
+			continue
 		}
 		parts, args = append(parts, quoteIdentifier(key)+"=?"), append(args, value)
 	}
