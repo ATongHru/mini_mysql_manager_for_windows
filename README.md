@@ -74,13 +74,19 @@ mysql-manage.exe -open-browser=false
 
 ## 构建
 
-在项目根目录双击 `build.bat`，或在命令提示符中运行：
+仓库提供无密码的 `build.example.bat` 模板。需要本地预填密码时，先复制它或使用现有的本地 `build.bat`，并只在该文件中填写密码：
 
 ```bat
 build.bat
 ```
 
-构建成功后会生成 `mysql-manage.exe`。`normal_build.bat` 也可用于构建；两者都不会注入或预填任何数据库密码。
+`build.bat` 和 `normal_build.bat` 均被 `.gitignore` 忽略，绝不会被提交。`build.bat` 通过 Go 链接参数在编译时写入本机默认密码；请将其中的 `__SET_YOUR_LOCAL_PASSWORD__` 替换为你的本地密码后再构建。不要把该文件改回 Git 跟踪状态。
+
+若不需要默认密码，可直接运行无密码模板：
+
+```bat
+build.example.bat
+```
 
 也可以直接执行：
 
@@ -111,8 +117,8 @@ go build -v -trimpath -ldflags="-s -w" -o mysql-manage.exe .
 .
 ├── main.go                 # Go 后端、HTTP API 与嵌入式静态页面
 ├── web/index.html          # 管理界面
-├── build.bat               # Windows 构建脚本（不含密码）
-├── normal_build.bat        # 无预设密码的备用构建脚本
+├── build.example.bat       # 可提交的无密码构建模板
+├── build.bat               # 仅本地使用，已被 Git 忽略，可预填密码
 ├── third_party/mysql       # 随项目附带的 MySQL 驱动源码
 └── go.mod                  # Go 模块与本地驱动替换配置
 ```

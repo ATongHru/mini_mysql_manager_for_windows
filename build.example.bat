@@ -3,8 +3,8 @@ setlocal
 cd /d "%~dp0"
 
 echo ==================================================
-echo MySQL Manager - Build
- echo Working directory: %CD%
+echo MySQL Manager - Build Template (no default password)
+echo Working directory: %CD%
 echo ==================================================
 echo.
 echo [1/2] Checking Go environment...
@@ -19,6 +19,7 @@ if errorlevel 1 goto :failed
 echo.
 echo ==================================================
 echo Build succeeded: %CD%\mysql-manage.exe
+echo This template does not include a database password.
 echo ==================================================
 pause
 exit /b 0
