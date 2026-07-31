@@ -2,11 +2,11 @@
 
 一个使用 Go 开发、可在 Windows 上直接运行的轻量级 MySQL 管理服务。程序启动后提供本地 Web 管理界面，支持登录 MySQL、浏览数据库和表、快捷筛选与 SQL 查询、记录编辑和删除，以及 SQL 导入导出；无需安装 Node.js、PHP 或独立的 Web 服务器。
 
-> **安全说明：** 本仓库不包含任何数据库密码。首次打开时密码输入框默认为空；请在运行时手动输入，或仅在受控环境中通过环境变量/命令行参数提供。请勿将密码写入源码、批处理脚本、`.env`、SQL 导出文件或提交记录。
+> **安全说明：** 请妥善保护数据库账号与导出的业务数据，避免将敏感信息提交到公开仓库。
 
 ## 功能
 
-- 连接 MySQL 服务器并浏览数据库、表和视图
+- 连接 MySQL 服务器并浏览数据库、表和视图，可选择在当前浏览器中记住登录信息
 - 分页查看表数据，支持单字段或最多 8 个条件组合筛选、排序
 - 编辑和删除记录：无主键表会使用整行原始数据定位记录
 - 执行 SQL，并为查询结果提供分页；支持常用关键字、表名和字段名补全
@@ -35,7 +35,7 @@ MySQL 驱动源码已随项目放在 `third_party/mysql` 中；在依赖未变�
 1. 从 Releases 下载 `mysql-manage.exe`，或按下文步骤自行构建。
 2. 双击 `mysql-manage.exe`。控制台窗口会保留；关闭该窗口即可停止服务。
 3. 浏览器会自动打开 `http://127.0.0.1:8080`。
-4. 在“连接 MySQL”页面填写主机、端口、用户名和密码。
+4. 在“连接 MySQL”页面填写主机、端口、用户名和密码；可勾选“记住登录信息”，将连接信息保存在当前浏览器。请勿在公用电脑上启用此选项。
    - 端口默认：`3306`
    - 用户名默认：`root`
    - 密码默认：**空**
@@ -74,21 +74,13 @@ mysql-manage.exe -open-browser=false
 
 ## 构建
 
-仓库提供无密码的 `build.example.bat` 模板。需要本地预填密码时，先复制它或使用现有的本地 `build.bat`，并只在该文件中填写密码：
+在 Windows 环境中双击或运行：
 
 ```bat
-build.bat
+normal_build.bat
 ```
 
-`build.bat` 和 `normal_build.bat` 均被 `.gitignore` 忽略，绝不会被提交。`build.bat` 通过 Go 链接参数在编译时写入本机默认密码；请将其中的 `__SET_YOUR_LOCAL_PASSWORD__` 替换为你的本地密码后再构建。不要把该文件改回 Git 跟踪状态。
-
-若不需要默认密码，可直接运行无密码模板：
-
-```bat
-build.example.bat
-```
-
-也可以直接执行：
+构建成功后会生成 `mysql-manage.exe`。也可以直接执行：
 
 ```bat
 go build -v -trimpath -ldflags="-s -w" -o mysql-manage.exe .
@@ -106,7 +98,7 @@ go build -v -trimpath -ldflags="-s -w" -o mysql-manage.exe .
 ## 安全建议
 
 1. 为此工具创建专用数据库账号，并按需授予数据库和操作权限。
-2. 不要在 `build.bat`、`normal_build.bat`、Go 源码或提交历史中保存密码。
+2. 不要将密码、令牌或其他敏感信息提交到 Git 历史。
 3. 不要提交 `.env`、SQL 导出、日志、证书或私钥；项目的 `.gitignore` 已默认忽略这些常见敏感文件。
 4. 使用完成后关闭程序的控制台窗口，以停止本地 Web 服务和数据库连接。
 5. 如曾把密码提交到任何远程仓库，应立即在数据库中轮换该密码；只删除文件无法消除 Git 历史中的泄露。
@@ -117,8 +109,7 @@ go build -v -trimpath -ldflags="-s -w" -o mysql-manage.exe .
 .
 ├── main.go                 # Go 后端、HTTP API 与嵌入式静态页面
 ├── web/index.html          # 管理界面
-├── build.example.bat       # 可提交的无密码构建模板
-├── build.bat               # 仅本地使用，已被 Git 忽略，可预填密码
+├── normal_build.bat        # 可提交的 Windows 构建脚本
 ├── third_party/mysql       # 随项目附带的 MySQL 驱动源码
 └── go.mod                  # Go 模块与本地驱动替换配置
 ```

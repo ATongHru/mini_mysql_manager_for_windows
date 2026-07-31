@@ -6,7 +6,6 @@ mysql-manage.exe
 *.test
 
 # Local configuration and credentials
-normal_build.bat
 build.bat
 .env
 .env.*

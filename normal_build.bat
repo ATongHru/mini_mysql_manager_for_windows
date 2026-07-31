@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 echo ==================================================
-echo MySQL Manager - Build Template (no default password)
+echo MySQL Manager - Build (no default password)
 echo Working directory: %CD%
 echo ==================================================
 echo.
@@ -19,7 +19,7 @@ if errorlevel 1 goto :failed
 echo.
 echo ==================================================
 echo Build succeeded: %CD%\mysql-manage.exe
-echo This template does not include a database password.
+echo No database password is included in this build.
 echo ==================================================
 pause
 exit /b 0
