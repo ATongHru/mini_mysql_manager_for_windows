@@ -1,0 +1,24 @@
+# Build output
+mysql-manage.exe
+*.exe
+*.exe~
+*.dll
+*.test
+
+# Local configuration and credentials
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Potentially sensitive database exports and logs
+*.sql
+*.log
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
