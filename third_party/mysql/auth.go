@@ -13,10 +13,13 @@ import (
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
+	"crypto/sha512"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"sync"
+
+	"filippo.io/edwards25519"
 )
 
 // server pub keys registry
@@ -225,10 +228,42 @@ func encryptPassword(password string, seed []byte, pub *rsa.PublicKey) ([]byte, 
 	return rsa.EncryptOAEP(sha1, rand.Reader, pub, plain, nil)
 }
 
-// authEd25519 is intentionally unavailable in this offline build.
-// Native MySQL authentication and caching_sha2_password remain supported.
+// authEd25519 does ed25519 authentication used by MariaDB.
 func authEd25519(scramble []byte, password string) ([]byte, error) {
-	return nil, fmt.Errorf("client_ed25519 authentication is not included in this offline build")
+	// Derived from https://github.com/MariaDB/server/blob/d8e6bb00888b1f82c031938f4c8ac5d97f6874c3/plugin/auth_ed25519/ref10/sign.c
+	// Code style is from https://cs.opensource.google/go/go/+/refs/tags/go1.21.5:src/crypto/ed25519/ed25519.go;l=207
+	h := sha512.Sum512([]byte(password))
+
+	s, err := edwards25519.NewScalar().SetBytesWithClamping(h[:32])
+	if err != nil {
+		return nil, err
+	}
+	A := (&edwards25519.Point{}).ScalarBaseMult(s)
+
+	mh := sha512.New()
+	mh.Write(h[32:])
+	mh.Write(scramble)
+	messageDigest := mh.Sum(nil)
+	r, err := edwards25519.NewScalar().SetUniformBytes(messageDigest)
+	if err != nil {
+		return nil, err
+	}
+
+	R := (&edwards25519.Point{}).ScalarBaseMult(r)
+
+	kh := sha512.New()
+	kh.Write(R.Bytes())
+	kh.Write(A.Bytes())
+	kh.Write(scramble)
+	hramDigest := kh.Sum(nil)
+	k, err := edwards25519.NewScalar().SetUniformBytes(hramDigest)
+	if err != nil {
+		return nil, err
+	}
+
+	S := k.MultiplyAdd(k, s, r)
+
+	return append(R.Bytes(), S.Bytes()...), nil
 }
 
 func (mc *mysqlConn) sendEncryptedPassword(seed []byte, pub *rsa.PublicKey) error {
@@ -270,7 +305,7 @@ func (mc *mysqlConn) auth(authData []byte, plugin string) ([]byte, error) {
 		if !mc.cfg.AllowNativePasswords {
 			return nil, ErrNativePassword
 		}
-		// https://dev.mysql.com/doc/internals/en/secure-password-authentication.html
+		// https://dev.mysql.com/doc/dev/mysql-server/8.4.5/page_protocol_connection_phase_authentication_methods_native_password_authentication.html
 		// Native password authentication only need and will need 20-byte challenge.
 		authResp := scramblePassword(authData[:20], mc.cfg.Passwd)
 		return authResp, nil

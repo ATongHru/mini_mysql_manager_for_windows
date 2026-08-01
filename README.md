@@ -2,7 +2,7 @@
 
 一个使用 Go 开发、可在 Windows 上直接运行的轻量级 MySQL 管理服务。程序启动后提供本地 Web 管理界面，支持登录 MySQL、浏览数据库和表、快捷筛选与 SQL 查询、记录编辑和删除，以及 SQL 导入导出；无需安装 Node.js、PHP 或独立的 Web 服务器。
 
-> 
+
 
 ## 功能
 
@@ -15,6 +15,19 @@
 - 支持 MySQL 常见的 `mysql_native_password` 和 `caching_sha2_password` 认证方式
 - 默认仅监听 `127.0.0.1`，不向局域网暴露管理界面
 
+## 快速开始
+
+1. 从 Releases 下载 `MiniMySQLManager.exe`，或按下文步骤自行构建。
+2. 双击 `MiniMySQLManager.exe`。控制台窗口会保留；关闭该窗口即可停止服务。
+3. 浏览器会自动打开 `http://127.0.0.1:8080`。
+4. 在“连接 MySQL”页面填写主机、端口、用户名和密码；可勾选“记住登录信息”，将连接信息保存在当前浏览器。请勿在公用电脑上启用此选项。
+   - 端口默认：`3306`
+   - 用户名默认：`root`
+   - 密码默认：**空**
+5. 连接成功后，选择数据库和表即可管理数据。
+
+如果浏览器没有自动打开，请在浏览器中访问控制台显示的地址。
+
 ## 系统要求
 
 ### 运行已构建的程序
@@ -26,22 +39,9 @@
 ### 从源码构建
 
 - Windows
-- Go 1.22 或更高版本
+- Go 1.24 或更高版本
 
-MySQL 驱动源码已随项目放在 `third_party/mysql` 中；在依赖未变化的情况下，构建不需要从网络下载该驱动。
-
-## 快速开始
-
-1. 从 Releases 下载 `mysql-manage.exe`，或按下文步骤自行构建。
-2. 双击 `mysql-manage.exe`。控制台窗口会保留；关闭该窗口即可停止服务。
-3. 浏览器会自动打开 `http://127.0.0.1:8080`。
-4. 在“连接 MySQL”页面填写主机、端口、用户名和密码；可勾选“记住登录信息”，将连接信息保存在当前浏览器。请勿在公用电脑上启用此选项。
-   - 端口默认：`3306`
-   - 用户名默认：`root`
-   - 密码默认：**空**
-5. 连接成功后，选择数据库和表即可管理数据。
-
-如果浏览器没有自动打开，请在浏览器中访问控制台显示的地址。
+MySQL 驱动及其 `edwards25519` 依赖源码已随项目放在 `third_party/` 中；在依赖未变化的情况下，构建不需要从网络下载驱动依赖。
 
 ## 启动参数与环境变量
 
@@ -59,7 +59,7 @@ MySQL 驱动源码已随项目放在 `third_party/mysql` 中；在依赖未变�
 示例：使用另一个本地端口启动，并手动连接数据库：
 
 ```bat
-mysql-manage.exe -addr 127.0.0.1:18080
+MiniMySQLManager.exe -addr 127.0.0.1:18080
 ```
 
 示例：启动时预填主机和用户名，但不在命令中暴露密码：
@@ -67,7 +67,7 @@ mysql-manage.exe -addr 127.0.0.1:18080
 ```bat
 set MYSQL_HOST=127.0.0.1
 set MYSQL_USER=readonly_user
-mysql-manage.exe -open-browser=false
+MiniMySQLManager.exe -open-browser=false
 ```
 
 > 命令行参数可能被本机其他具有相应权限的进程查看；环境变量也会被子进程继承。对于长期或高敏感度使用，请优先在界面中手动输入密码，并使用专用、最小权限的数据库账号。
@@ -80,10 +80,10 @@ mysql-manage.exe -open-browser=false
 normal_build.bat
 ```
 
-构建成功后会生成 `mysql-manage.exe`。也可以直接执行：
+构建成功后会生成 `MiniMySQLManager.exe`。也可以直接执行：
 
 ```bat
-go build -v -trimpath -ldflags="-s -w" -o mysql-manage.exe .
+go build -v -trimpath -ldflags="-s -w" -o MiniMySQLManager.exe .
 ```
 
 ## 使用说明与限制
@@ -92,7 +92,7 @@ go build -v -trimpath -ldflags="-s -w" -o mysql-manage.exe .
 - **查询：** 查询结果默认每页最多 100 行，单次最多 500 行。复杂 SQL 的执行超时为 60 秒。
 - **导入：** 导入上限为 50 MB。导入由 MySQL 执行；如果脚本后半部分失败，前面已成功执行的语句不会自动回滚。
 - **导出：** 导出会生成 `DROP TABLE IF EXISTS`、`CREATE TABLE`，并可选择导出当前筛选结果或整表数据为 `INSERT` 语句。导出文件可能含有业务敏感数据，请妥善保存，且不要提交到 Git。
-- **认证：** 当前随附驱动不支持 MariaDB `client_ed25519` 认证插件。
+- **认证：** 当前随附驱动支持 MariaDB `client_ed25519` 认证插件。
 - **网络：** 默认仅限本机访问。若主动将 `-addr` 设置为 `0.0.0.0:端口`，请先部署防火墙、访问控制和额外认证措施；该工具本身不适合直接暴露到公网。
 
 ## 安全建议
@@ -111,6 +111,7 @@ go build -v -trimpath -ldflags="-s -w" -o mysql-manage.exe .
 ├── web/index.html          # 管理界面
 ├── normal_build.bat        # 可提交的 Windows 构建脚本
 ├── third_party/mysql       # 随项目附带的 MySQL 驱动源码
+├── third_party/edwards25519 # MySQL 驱动的本地依赖源码
 └── go.mod                  # Go 模块与本地驱动替换配置
 ```
 
@@ -122,16 +123,16 @@ go build -v -trimpath -ldflags="-s -w" -o mysql-manage.exe .
 go build ./...
 ```
 
-随后启动新生成的 `mysql-manage.exe`，在本机测试连接、查询和修改操作。请使用测试数据库进行写入、导入和删除验证。
+随后启动新生成的 `MiniMySQLManager.exe`，在本机测试连接、查询和修改操作。请使用测试数据库进行写入、导入和删除验证。
 
 ## 许可证
 
 本项目采用 [MIT License](LICENSE)，版权归 `ATongHru` 所有。
 
-本项目包含 `github.com/go-sql-driver/mysql` 的源码副本。该组件及其原始版权声明继续受 MPL-2.0 约束：
+本项目包含 `github.com/go-sql-driver/mysql` 和 `filippo.io/edwards25519` 的源码副本：
 
-- 第三方依赖声明： [NOTICE](NOTICE)
-- 完整 MPL-2.0 文本： [LICENSE-MPL20](LICENSE-MPL20)
-- 随附源码中的原始许可证文本： [`third_party/mysql/LICENSE`](third_party/mysql/LICENSE)
+- MySQL 驱动受 MPL-2.0 约束，完整文本见 [LICENSE-MPL20](LICENSE-MPL20)，原始许可证见 [`third_party/mysql/LICENSE`](third_party/mysql/LICENSE)。
+- `edwards25519` 受 BSD-3-Clause 许可证约束，原始许可证见 [`third_party/edwards25519/LICENSE`](third_party/edwards25519/LICENSE)。
+- 第三方依赖声明见 [NOTICE](NOTICE)。
 
-`third_party/mysql` 中原有的版权声明、作者列表和 MPL-2.0 许可证文本均已保留。
+上述目录中的原始版权声明和许可证文本均已保留。

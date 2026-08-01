@@ -8,4 +8,9 @@ This project makes use of the following third-party open-source dependencies:
    License: MPL-2.0
    License Text: https://mozilla.org/MPL/2.0/
 
+2. Module: filippo.io/edwards25519
+   Repository: https://github.com/FiloSottile/edwards25519
+   License: BSD-3-Clause
+   License Text: third_party/edwards25519/LICENSE
+
 All copyrights of the above-mentioned libraries belong to their respective copyright holders.

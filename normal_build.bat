@@ -12,13 +12,13 @@ go version
 if errorlevel 1 goto :failed
 
 echo.
-echo [2/2] Building mysql-manage.exe...
-go build -v -trimpath -ldflags="-s -w" -o mysql-manage.exe .
+echo [2/2] Building MiniMySQLManager.exe...
+go build -v -trimpath -ldflags="-s -w" -o MiniMySQLManager.exe .
 if errorlevel 1 goto :failed
 
 echo.
 echo ==================================================
-echo Build succeeded: %CD%\mysql-manage.exe
+echo Build succeeded: %CD%\MiniMySQLManager.exe
 echo No database password is included in this build.
 echo ==================================================
 pause
