@@ -1,19 +1,19 @@
 # Mini MySQL Manager for Windows
 
-一个使用 Go 开发、可在 Windows 上直接运行的轻量级 MySQL 管理服务。程序启动后提供本地 Web 管理界面，支持登录 MySQL、浏览数据库和表、快捷筛选与 SQL 查询、记录编辑和删除，以及 SQL 导入导出；无需安装 Node.js、PHP 或独立的 Web 服务器。
+一个使用 Go 开发、可在 Windows 上直接运行的轻量级 MySQL 管理服务。程序启动后提供本地 Web 管理界面，支持登录 MySQL、浏览数据库和表、筛选排序与 SQL 查询、记录和表结构维护，以及 SQL 导入导出。
 
-
+![Mini MySQL Manager 管理界面](assets/interface-v1.1.2.png)
 
 ## 功能
 
-- 连接 MySQL 服务器并浏览数据库、表和视图，可选择在当前浏览器中记住登录信息
-- 分页查看表数据，支持单字段或最多 8 个条件组合筛选（AND / OR）、排序
-- 编辑和删除记录：无主键表会使用整行原始数据定位记录
-- 执行 SQL，并为查询结果提供分页；支持常用关键字、表名和字段名补全
-- 导入 `.sql` 文件（最大 50 MB）
-- 导出表结构，或导出表结构和数据为 SQL 文件
-- 支持 MySQL 常见的 `mysql_native_password` 和 `caching_sha2_password` 认证方式
-- 默认仅监听 `127.0.0.1`，不向局域网暴露管理界面
+- 连接 MySQL 服务器并浏览数据库、表和视图；连接权限、对象树和表记录数会在本地服务存活期间缓存，可选择在当前浏览器中记住登录信息。
+- 分页查看表数据，支持最多 8 个筛选条件组合（AND / OR）及最多 8 个字段的升降序排序；可复制整条记录，并批量删除选中记录。
+- 编辑、新增和删除记录；无主键表会使用整行原始数据定位记录。支持开启、提交或回滚当前表操作事务，未提交的数据会立即显示在表格中。
+- 管理表结构：新建表、查看表信息和 `CREATE TABLE` 语句、重命名或清空表、修改字段名称/类型/可空性/主键，以及维护字段和索引。
+- SQL 控制台支持多标签页、查询结果分页、常用关键字/表名/字段名补全；可按连接和数据库保存查询，并将查询结果选择性导出为 UTF-8 CSV。
+- 导入 `.sql` 文件（最大 50 MB，提供兼容模式）；逻辑导出可包含表结构和当前筛选结果或整表数据。SQL、CSV 和备份文件会保存到程序所在目录，避免受浏览器下载设置影响。
+- 支持 MySQL 常见的 `mysql_native_password` 和 `caching_sha2_password` 认证方式，以及 MariaDB `client_ed25519` 认证插件。
+- 默认仅监听 `127.0.0.1`，不向局域网暴露管理界面；在 Chromium 系浏览器中会以独立应用窗口打开。
 
 ## 快速开始
 
@@ -41,7 +41,7 @@
 - Windows
 - Go 1.24 或更高版本
 
-MySQL 驱动及其 `edwards25519` 依赖源码已随项目放在 `third_party/` 中；在依赖未变化的情况下，构建不需要从网络下载驱动依赖。
+项目随附 `github.com/go-sql-driver/mysql` v1.10.0 及其 `filippo.io/edwards25519` v1.2.0 依赖源码，位于 `third_party/`。在依赖未变化的情况下，构建不需要从网络下载驱动依赖。
 
 ## 启动参数与环境变量
 
@@ -91,8 +91,9 @@ go build -v -trimpath -ldflags="-s -w" -o MiniMySQLManager.exe .
 - **数据修改：** 有主键时使用主键定位；没有主键时使用整行原始数据定位。若存在完全相同的重复行，编辑或删除可能同时影响多条记录。
 - **查询：** 查询结果默认每页最多 100 行，单次最多 500 行。复杂 SQL 的执行超时为 60 秒。
 - **导入：** 导入上限为 50 MB。导入由 MySQL 执行；如果脚本后半部分失败，前面已成功执行的语句不会自动回滚。
-- **导出：** 导出会生成 `DROP TABLE IF EXISTS`、`CREATE TABLE`，并可选择导出当前筛选结果或整表数据为 `INSERT` 语句。导出文件可能含有业务敏感数据，请妥善保存，且不要提交到 Git。
-- **认证：** 当前随附驱动支持 MariaDB `client_ed25519` 认证插件。
+- **导出：** 表导出会生成 `DROP TABLE IF EXISTS`、`CREATE TABLE`，并可选择导出当前筛选结果或整表数据为 `INSERT` 语句；SQL 控制台查询可导出为 CSV。导出文件保存在程序所在目录，可能含有业务敏感数据，请妥善保存，且不要提交到 Git。
+- **事务：** 同一时间仅维护一个本地表操作事务；重新连接或断开连接时，未完成的事务会自动回滚。
+- **结构修改：** 修改已有字段类型前，如表中存在数据，程序会要求再次确认；请先备份并在测试库验证转换结果。
 - **网络：** 默认仅限本机访问。若主动将 `-addr` 设置为 `0.0.0.0:端口`，请先部署防火墙、访问控制和额外认证措施；该工具本身不适合直接暴露到公网。
 
 ## 安全建议
@@ -129,10 +130,10 @@ go build ./...
 
 本项目采用 [MIT License](LICENSE)，版权归 `ATongHru` 所有。
 
-本项目包含 `github.com/go-sql-driver/mysql` 和 `filippo.io/edwards25519` 的源码副本：
+本项目包含以下第三方依赖的源码副本；其许可证不改变本项目自身源代码的 MIT 许可证，但在再发布源代码或编译后的可执行文件时，必须保留相应的许可证文本、版权声明和第三方声明：
 
-- MySQL 驱动受 MPL-2.0 约束，完整文本见 [LICENSE-MPL20](LICENSE-MPL20)，原始许可证见 [`third_party/mysql/LICENSE`](third_party/mysql/LICENSE)。
-- `edwards25519` 受 BSD-3-Clause 许可证约束，原始许可证见 [`third_party/edwards25519/LICENSE`](third_party/edwards25519/LICENSE)。
-- 第三方依赖声明见 [NOTICE](NOTICE)。
+- `github.com/go-sql-driver/mysql` v1.10.0 受 [MPL-2.0](LICENSE-MPL20) 约束；其原始许可证见 [`third_party/mysql/LICENSE`](third_party/mysql/LICENSE)。对该驱动源码文件的修改须继续按 MPL-2.0 提供相应源代码。
+- `filippo.io/edwards25519` v1.2.0 受 BSD-3-Clause 许可证约束；原始许可证见 [`third_party/edwards25519/LICENSE`](third_party/edwards25519/LICENSE)。
+- 完整的第三方依赖与许可证声明见 [NOTICE](NOTICE)。
 
 上述目录中的原始版权声明和许可证文本均已保留。

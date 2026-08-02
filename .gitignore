@@ -4,6 +4,7 @@ mysql-manage.exe
 *.exe~
 *.dll
 *.test
+rsrc_windows_amd64.syso
 
 # Local configuration and credentials
 build.bat

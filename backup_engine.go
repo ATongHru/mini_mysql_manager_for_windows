@@ -13,7 +13,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -105,6 +104,7 @@ func (s *server) importSQL(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 500, "导入失败（MySQL 的建库、建表等 DDL 会立即生效，不能自动整体回滚）: "+err.Error())
 		return
 	}
+	s.clearMetadataCache()
 	writeJSON(w, 200, map[string]string{"message": "SQL 已执行完成"})
 }
 
@@ -151,18 +151,64 @@ type sqlStatementExecutor interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
 }
 
+func (p *sqlScriptParser) canChangeDelimiter() bool {
+	return p.quote == 0 && p.closed == 0 && !p.escaped && !p.lineComment && !p.blockComment && sqlScriptTriviaOnly(p.statement.String())
+}
+
+func (p *sqlScriptParser) resetStatement() {
+	p.statement.Reset()
+	p.quote, p.closed, p.escaped, p.lineComment, p.blockComment, p.previous = 0, 0, false, false, false, 0
+}
+
+// sqlScriptTriviaOnly reports whether text contains only whitespace and ordinary
+// comments. MySQL executable comments (/*! ... */) are deliberately retained.
+func sqlScriptTriviaOnly(text string) bool {
+	for index := 0; index < len(text); {
+		if text[index] == ' ' || text[index] == '\t' || text[index] == '\r' || text[index] == '\n' {
+			index++
+			continue
+		}
+		if text[index] == '#' || (text[index] == '-' && index+1 < len(text) && text[index+1] == '-') {
+			if next := strings.IndexByte(text[index:], '\n'); next >= 0 {
+				index += next + 1
+				continue
+			}
+			return true
+		}
+		if text[index] == '/' && index+1 < len(text) && text[index+1] == '*' {
+			if index+2 < len(text) && text[index+2] == '!' {
+				return false
+			}
+			next := strings.Index(text[index+2:], "*/")
+			if next < 0 {
+				return false
+			}
+			index += next + 4
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func sqlDelimiterDirective(line string) (string, bool) {
+	fields := strings.Fields(strings.TrimSpace(line))
+	if len(fields) != 2 || !strings.EqualFold(fields[0], "DELIMITER") || len(fields[1]) > 16 || strings.ContainsAny(fields[1], " \t\r\n") {
+		return "", false
+	}
+	return fields[1], true
+}
+
 func executeSQLScript(ctx context.Context, executor sqlStatementExecutor, reader io.Reader, targetSchema string) error {
 	parser := &sqlScriptParser{ctx: ctx, executor: executor, targetSchema: targetSchema, delimiter: ";"}
 	buffered := bufio.NewReaderSize(reader, 64*1024)
 	for {
 		line, err := buffered.ReadString('\n')
 		if len(line) > 0 {
-			if parser.statement.Len() == 0 {
-				fields := strings.Fields(strings.TrimSpace(line))
-				if len(fields) == 2 && strings.EqualFold(fields[0], "DELIMITER") && len(fields[1]) <= 16 && !strings.ContainsAny(fields[1], " \t\r\n") {
-					parser.delimiter = fields[1]
-					continue
-				}
+			if delimiter, ok := sqlDelimiterDirective(line); ok && parser.canChangeDelimiter() {
+				parser.resetStatement()
+				parser.delimiter = delimiter
+				continue
 			}
 			if err := parser.write(line); err != nil {
 				return err
@@ -304,57 +350,138 @@ func (s *server) exportSQL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	includeData := r.URL.Query().Get("data") != "0"
-	filename := schema + "_" + table + ".sql"
-	w.Header().Set("Content-Type", "application/sql; charset=utf-8")
-	w.Header().Set("Content-Disposition", "attachment; filename*=UTF-8''"+url.PathEscape(filename))
-	_, _ = fmt.Fprintf(w, "-- Exported by MySQL Manager at %s\n\n", time.Now().Format(time.RFC3339))
-	var ignored, createSQL string
-	if err := db.QueryRow("SHOW CREATE TABLE "+qualify(schema, table)).Scan(&ignored, &createSQL); err != nil {
-		writeDBError(w, err)
-		return
-	}
-	_, _ = fmt.Fprintf(w, "DROP TABLE IF EXISTS %s;\n%s;\n\n", quoteIdentifier(table), createSQL)
-	if !includeData {
-		return
-	}
-	rows, err := db.Query("SELECT * FROM "+qualify(schema, table)+filters, args...)
+	tx, err := db.BeginTx(r.Context(), &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
 	if err != nil {
 		writeDBError(w, err)
 		return
 	}
-	defer rows.Close()
-	colNames, err := rows.Columns()
-	if err != nil {
-		writeDBError(w, err)
-		return
-	}
-	columnTypes, err := rows.ColumnTypes()
-	if err != nil {
-		writeDBError(w, err)
-		return
-	}
-	quotedNames := make([]string, len(colNames))
-	jsonColumns := make([]bool, len(colNames))
-	for i, name := range colNames {
-		quotedNames[i] = quoteIdentifier(name)
-		jsonColumns[i] = strings.EqualFold(columnTypes[i].DatabaseTypeName(), "JSON")
-	}
-	for rows.Next() {
-		values := make([]any, len(colNames))
-		refs := make([]any, len(colNames))
-		for i := range values {
-			refs[i] = &values[i]
+	transactionDone := false
+	defer func() {
+		if !transactionDone {
+			_ = tx.Rollback()
 		}
-		if err := rows.Scan(refs...); err != nil {
+	}()
+	var tableType string
+	if err := tx.QueryRow(`SELECT TABLE_TYPE FROM information_schema.TABLES WHERE TABLE_SCHEMA=? AND TABLE_NAME=?`, schema, table).Scan(&tableType); err != nil {
+		if err == sql.ErrNoRows {
+			writeError(w, http.StatusNotFound, "找不到指定的数据表")
+		} else {
 			writeDBError(w, err)
-			return
 		}
-		literals := make([]string, len(values))
-		for i, value := range values {
-			literals[i] = sqlLiteralForColumn(value, jsonColumns[i])
-		}
-		_, _ = fmt.Fprintf(w, "INSERT INTO %s (%s) VALUES (%s);\n", quoteIdentifier(table), strings.Join(quotedNames, ","), strings.Join(literals, ","))
+		return
 	}
+	if tableType != "BASE TABLE" {
+		writeError(w, http.StatusBadRequest, "逻辑导出仅支持基础表")
+		return
+	}
+	filename := table + "_" + time.Now().Format("20060102_150405") + ".sql"
+	file, path, err := createExportFile(filename)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "无法创建导出文件: "+err.Error())
+		return
+	}
+	completed := false
+	defer func() {
+		if !completed {
+			_ = file.Close()
+			_ = os.Remove(path)
+		}
+	}()
+	var ignored, createSQL string
+	if err := tx.QueryRow("SHOW CREATE TABLE "+qualify(schema, table)).Scan(&ignored, &createSQL); err != nil {
+		writeDBError(w, err)
+		return
+	}
+	if _, err := fmt.Fprintf(file, "-- Exported by MySQL Manager at %s\n-- Native logical export: structure from SHOW CREATE TABLE, data in 1000-row pages\n\n/*!40101 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;\n/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;\n\nDROP TABLE IF EXISTS %s;\n%s;\n\n", time.Now().Format(time.RFC3339), quoteIdentifier(table), strings.TrimSuffix(createSQL, ";")); err != nil {
+		writeError(w, http.StatusInternalServerError, "写入导出文件失败: "+err.Error())
+		return
+	}
+	if includeData {
+		const batchSize = 1000
+		var offset int64
+		orderBy := ""
+		if len(meta.PrimaryKeys) > 0 {
+			keys := make([]string, len(meta.PrimaryKeys))
+			for i, key := range meta.PrimaryKeys {
+				keys[i] = quoteIdentifier(key) + " ASC"
+			}
+			orderBy = " ORDER BY " + strings.Join(keys, ",")
+		}
+		var quotedNames []string
+		var jsonColumns []bool
+		for {
+			pageArgs := append([]any{}, args...)
+			pageArgs = append(pageArgs, batchSize, offset)
+			rows, err := tx.Query("SELECT * FROM "+qualify(schema, table)+filters+orderBy+" LIMIT ? OFFSET ?", pageArgs...)
+			if err != nil {
+				writeDBError(w, err)
+				return
+			}
+			colNames, err := rows.Columns()
+			if err == nil && quotedNames == nil {
+				columnTypes, typeErr := rows.ColumnTypes()
+				if typeErr != nil {
+					err = typeErr
+				} else {
+					quotedNames, jsonColumns = make([]string, len(colNames)), make([]bool, len(colNames))
+					for i, name := range colNames {
+						quotedNames[i] = quoteIdentifier(name)
+						jsonColumns[i] = strings.EqualFold(columnTypes[i].DatabaseTypeName(), "JSON")
+					}
+				}
+			}
+			if err != nil {
+				_ = rows.Close()
+				writeDBError(w, err)
+				return
+			}
+			batchRows := 0
+			for rows.Next() {
+				values, refs := make([]any, len(colNames)), make([]any, len(colNames))
+				for i := range values {
+					refs[i] = &values[i]
+				}
+				if err := rows.Scan(refs...); err != nil {
+					_ = rows.Close()
+					writeDBError(w, err)
+					return
+				}
+				literals := make([]string, len(values))
+				for i, value := range values {
+					literals[i] = sqlLiteralForColumn(value, jsonColumns[i])
+				}
+				if _, err := fmt.Fprintf(file, "INSERT INTO %s (%s) VALUES (%s);\n", quoteIdentifier(table), strings.Join(quotedNames, ","), strings.Join(literals, ",")); err != nil {
+					_ = rows.Close()
+					writeError(w, http.StatusInternalServerError, "写入导出文件失败: "+err.Error())
+					return
+				}
+				batchRows++
+			}
+			if err := rows.Err(); err != nil {
+				_ = rows.Close()
+				writeDBError(w, err)
+				return
+			}
+			if err := rows.Close(); err != nil {
+				writeDBError(w, err)
+				return
+			}
+			if batchRows < batchSize {
+				break
+			}
+			offset += int64(batchRows)
+		}
+	}
+	if _, err := fmt.Fprint(file, "\n/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;\n/*!40101 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;\n"); err != nil {
+		writeError(w, http.StatusInternalServerError, "写入导出文件失败: "+err.Error())
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		writeDBError(w, err)
+		return
+	}
+	transactionDone = true
+	completed = finishExportFile(w, file, path)
 	_ = meta
 }
 
@@ -425,41 +552,16 @@ func (s *server) downloadBackup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "备份文件尚未准备完成")
 		return
 	}
-	file, err := os.Open(path)
-	if err != nil {
+	if _, err := os.Stat(path); err != nil {
 		writeError(w, http.StatusNotFound, "备份文件不可用: "+err.Error())
 		return
 	}
-	defer file.Close()
-	defer func() {
-		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-			log.Printf("failed to remove temporary backup file %s: %v", path, err)
-		}
-		if err := os.Remove(filepath.Dir(path)); err != nil && !errors.Is(err, os.ErrNotExist) {
-			log.Printf("failed to remove temporary backup directory %s: %v", filepath.Dir(path), err)
-		}
-	}()
-	info, err := file.Stat()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "无法读取备份文件: "+err.Error())
-		return
-	}
-	filename := filepath.Base(path)
-	w.Header().Set("Content-Type", "application/gzip")
-	w.Header().Set("Content-Disposition", "attachment; filename*=UTF-8''"+url.PathEscape(filename))
-	http.ServeContent(w, r, filename, info.ModTime(), file)
+	writeJSON(w, http.StatusOK, map[string]string{"message": "备份完成", "path": path, "filename": filepath.Base(path)})
 }
 
 func (s *server) runBackup(job *backupJob, db *sql.DB) {
-	directory, err := backupDirectory()
-	if err != nil {
-		s.finishBackup(job, false, "无法创建备份目录: "+err.Error(), "")
-		return
-	}
 	stamp := job.StartedAt.Format("20060102-150405")
-	finalPath := filepath.Join(directory, job.Schema+"-"+stamp+".sql.gz")
-	partPath := finalPath + ".part"
-	file, err := os.Create(partPath)
+	file, finalPath, err := createExportFile(job.Schema + "-" + stamp + ".sql.gz")
 	if err != nil {
 		s.finishBackup(job, false, "无法创建备份文件: "+err.Error(), "")
 		return
@@ -488,13 +590,8 @@ func (s *server) runBackup(job *backupJob, db *sql.DB) {
 		err = fileErr
 	}
 	if err != nil {
-		_ = os.Remove(partPath)
+		_ = os.Remove(finalPath)
 		s.finishBackup(job, false, "数据库导出失败: "+err.Error(), "")
-		return
-	}
-	if err := os.Rename(partPath, finalPath); err != nil {
-		_ = os.Remove(partPath)
-		s.finishBackup(job, false, "备份文件保存失败: "+err.Error(), "")
 		return
 	}
 	info, _ := os.Stat(finalPath)

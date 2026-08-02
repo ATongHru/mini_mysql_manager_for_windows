@@ -2,7 +2,9 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MySQL Manager</title>
+<title>Mini MySQL Manager for Windows</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="alternate icon" href="/favicon.ico" sizes="any">
 <style>
 :root{--bg:#f4f7fb;--panel:#fff;--line:#dfe6ef;--ink:#172033;--muted:#607087;--blue:#1769e0;--danger:#c83d45}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,"Microsoft YaHei",sans-serif}button,input,select{font:inherit}button{border:0;border-radius:7px;padding:8px 12px;background:var(--blue);color:#fff;cursor:pointer}button:hover{filter:brightness(.94)}button.secondary{background:#e8eef7;color:#26354c}button.danger{background:var(--danger)}#app{--sidebar-width:280px;display:grid;grid-template-columns:var(--sidebar-width) 10px minmax(0,1fr);height:100vh}.sidebar{min-width:0;background:#1c2638;color:#e9effa;padding:18px 12px;overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#70809a transparent}.sidebar::-webkit-scrollbar{width:6px}.sidebar::-webkit-scrollbar-track{background:transparent}.sidebar::-webkit-scrollbar-thumb{background:#70809a;border-radius:10px;border:1px solid transparent;background-clip:padding-box}.sidebar::-webkit-scrollbar-thumb:hover{background:#91a3c0;border:1px solid transparent;background-clip:padding-box}body:not(.dark) .sidebar{background:#fff;color:var(--ink);border-right:1px solid var(--line)}body:not(.dark) .sidebar .connection{color:var(--muted);border-color:var(--line)}body:not(.dark) .sidebar .db-title{color:var(--ink)}body:not(.dark) .sidebar .db-title:hover,body:not(.dark) .sidebar .table.active{background:#eaf2ff}body:not(.dark) .sidebar .table{color:#53647d}body:not(.dark) .sidebar{scrollbar-color:#aebbd0 transparent}body:not(.dark) .sidebar::-webkit-scrollbar-thumb{background:#b8c4d6;border:1px solid transparent;background-clip:padding-box}body:not(.dark) .sidebar::-webkit-scrollbar-thumb:hover{background:#8fa2bf;border:1px solid transparent;background-clip:padding-box}body:not(.dark) #body tr:nth-child(odd) td{background:#f5f7fb}body:not(.dark) #body tr:nth-child(even) td{background:#fff}body:not(.dark) #body tr:hover td{background:#eaf2ff}body:not(.dark) .sidebar .db-title.active{background:#dceaff;color:#0d4fa8}body.dark .sidebar{background:#1c2638;color:#e9effa}body.dark #body tr:nth-child(odd) td{background:#202c41}body.dark #body tr:nth-child(even) td{background:#182235}body.dark #body tr:hover td{background:#2b3b56}body.dark .sidebar .table{color:#d2dceb}body.dark .sidebar .db-title.active{background:#314b72;color:#fff}.sidebar-resizer{position:relative;cursor:col-resize;touch-action:none;background:#dfe6ef}.sidebar-resizer::after{content:"";position:absolute;top:0;bottom:0;left:4px;width:2px;background:transparent}.sidebar-resizer:hover::after,.sidebar-resizer.dragging::after{background:var(--blue)}body.resizing{cursor:col-resize;user-select:none}.brand{font-weight:750;font-size:18px;padding:0 8px 14px}.connection{font-size:12px;color:#a9b9d1;padding:0 8px 15px;border-bottom:1px solid #334158}.service-status{padding-top:8px;padding-bottom:8px;border-bottom:0}.service-status::before{content:"●";margin-right:6px;color:#74d69c}.service-status.offline::before{color:#ff7883}body.dark{--bg:#101827;--panel:#182235;--line:#35445d;--ink:#e7edf8;--muted:#a9b7cb;--blue:#4b94ff;--danger:#e25c68;background:#101827}body.dark .content,body.dark .empty,body.dark .card,body.dark dialog{background:var(--panel);color:var(--ink)}body.dark .card,body.dark th,body.dark td,body.dark input,body.dark select,body.dark textarea,body.dark .sql-suggestions{border-color:var(--line)}body.dark th{background:#202c41;color:var(--muted)}body.dark tr:hover td{background:#202b3d}body.dark input,body.dark select,body.dark textarea,body.dark .sql-top select{background:#111a29;color:var(--ink)}body.dark button.secondary,body.dark .tab{background:#2a3850;color:#e7edf8}body.dark .sql-suggestion{background:#182235;color:var(--ink)}body.dark .sql-suggestion:hover{background:#273754}body.dark .backup-card{background:var(--panel);color:var(--ink)}.db{margin-top:13px}.db-title{display:flex;justify-content:space-between;align-items:center;min-width:0;padding:7px 8px;font-weight:650;cursor:pointer;border-radius:5px}.db-title span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.db-title:hover,.table.active{background:#2d3d58}.tables{padding-left:8px}.table{display:block;width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:transparent;text-align:left;padding:6px 9px;border-radius:5px;color:#cfdbed}.table::before{content:"";padding-right:8px;color:#8fb8ff}.content{min-width:0;overflow:auto;padding:25px 30px}.empty{max-width:580px;margin:15vh auto;text-align:center;color:var(--muted)}.empty h1{color:var(--ink)}.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px}.toolbar h1{font-size:22px;margin:0 auto 0 0}.export-control{display:inline-flex;align-items:stretch;min-height:38px;border:1px solid var(--blue);border-radius:8px;overflow:hidden;background:var(--panel)}.export-mode{min-width:150px;border:0!important;border-right:1px solid var(--blue)!important;border-radius:0!important;padding:5px 28px 5px 10px!important;background-color:transparent!important;color:var(--ink);cursor:pointer;appearance:auto}.export-control #exportBtn{border-radius:0!important;box-shadow:none}body.dark .export-mode{background-color:transparent!important}#tableActions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:0 1px 2px #1020400b}.filter{margin-bottom:14px}.filter-list{display:flex;flex-direction:column;gap:8px}.filter-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.filter select,.filter input{border:1px solid var(--line);border-radius:6px;padding:7px;background:#fff}.filter input{min-width:190px}.filter-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.filter-note{font-size:12px;color:var(--muted);margin:0 0 8px}.filter-logic{display:flex;align-items:center;gap:8px;margin:0 0 8px;color:var(--muted);font-size:12px}.table-wrap{overflow:auto;max-height:calc(100vh - 245px);scrollbar-width:thin;scrollbar-color:#9aabc2 #e7edf5;scrollbar-gutter:stable both-edges}.table-wrap::-webkit-scrollbar{width:6px;height:6px}.table-wrap::-webkit-scrollbar-track{background:#e7edf5;border-radius:10px}.table-wrap::-webkit-scrollbar-thumb{background:#9aabc2;border:1px solid #e7edf5;border-radius:10px;background-clip:padding-box}.table-wrap::-webkit-scrollbar-thumb:hover{background:#7087a6}.table-wrap::-webkit-scrollbar-corner{background:#e7edf5}.table-wrap::-webkit-scrollbar-button{width:0;height:0}body.dark .table-wrap{scrollbar-color:#455b7d #111a29}body.dark .table-wrap::-webkit-scrollbar-track,body.dark .table-wrap::-webkit-scrollbar-corner{background:#111a29}body.dark .table-wrap::-webkit-scrollbar-thumb{background:#455b7d;border-color:#111a29}body.dark .table-wrap::-webkit-scrollbar-thumb:hover{background:#6680a8}table{border-collapse:collapse;width:100%;white-space:nowrap}th,td{border-bottom:1px solid var(--line);padding:9px 10px;text-align:left;max-width:260px;overflow:hidden;text-overflow:ellipsis}th{position:sticky;top:0;background:#f8faff;font-size:12px;color:#536177}.sortable{cursor:pointer;user-select:none}.sortable:hover{background:#edf4ff;color:var(--blue)}.sort-mark{font-size:11px;margin-left:4px;color:var(--blue)}tr:hover td{background:#fbfdff}.actions{display:flex;gap:6px}.small{padding:5px 8px;font-size:12px}.pager{display:flex;gap:10px;align-items:center;margin-top:13px;color:var(--muted)}dialog{border:0;border-radius:12px;box-shadow:0 15px 50px #10204055;width:min(680px,94vw)}dialog::backdrop{background:#11213a88}.modal-title{margin:0 0 15px}.form-grid{display:grid;grid-template-columns:150px 1fr;gap:9px;align-items:center;max-height:60vh;overflow:auto}.form-grid input{padding:8px;border:1px solid var(--line);border-radius:6px;width:min(320px,100%)}.remember-login{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)}.form-grid .remember-login input{width:auto;margin:0;padding:0}.field-editor{display:flex;align-items:center;gap:10px;min-width:0}.field-type{color:var(--muted);font:12px ui-monospace,SFMono-Regular,Consolas,monospace;white-space:nowrap}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.hint{color:var(--muted);font-size:12px;margin:5px 0 14px}.connect{width:100%;margin:3px 0 8px}.connection-actions{display:flex;gap:6px;margin:3px 0 8px}.connection-actions .connect{width:auto;flex:1;margin:0}.connect.connected{background:#66758a;color:#fff}.resource-monitor{margin:7px 0 9px;background:#17253aef;color:#edf4ff;border:1px solid #435774;border-radius:7px;padding:6px 8px;font-size:11px;line-height:1.45;pointer-events:none}.resource-monitor strong{display:block;color:#fff;font-size:11px}.resource-monitor span{display:block}body:not(.dark) .resource-monitor{background:#eef4ff;color:#26354c;border-color:#c8d7ee}body:not(.dark) .resource-monitor strong{color:#1e3d69}body.dark .resource-monitor{background:#0d1422ef;border-color:#3e5070}.toast{position:fixed;right:20px;bottom:20px;background:#1d2d45;color:#fff;padding:11px 15px;border-radius:7px;box-shadow:0 3px 18px #0004;display:none;max-width:min(680px,calc(100vw - 40px));word-break:break-all;z-index:11}.toast.show{display:block}.backup-overlay{position:fixed;inset:0;background:#11213a88;display:flex;align-items:center;justify-content:center;z-index:10}.backup-card{width:min(430px,calc(100vw - 32px));background:#fff;border-radius:12px;padding:22px;box-shadow:0 18px 60px #0005}.backup-card h2{margin:0 0 9px}.backup-card p{margin:10px 0 0;color:var(--muted);word-break:break-all}.backup-card progress{width:100%;height:16px}.hidden{display:none!important}@media(max-width:720px){#app{grid-template-columns:1fr;height:auto;min-height:100vh}.sidebar-resizer{display:none}.sidebar{max-height:35vh}.content{padding:15px}.toolbar h1{width:100%;margin:0 0 8px}.form-grid{grid-template-columns:1fr}}
 .tab-bar{display:flex;gap:5px;overflow-x:auto;margin:-8px 0 12px;padding-bottom:2px}.tab{display:flex;align-items:center;gap:7px;border:1px solid var(--line);background:#e9eef6;color:#42516a;border-radius:7px;padding:7px 10px;white-space:nowrap;cursor:pointer}.tab.active{background:var(--blue);border-color:var(--blue);color:#fff}.tab-close{font-size:16px;line-height:12px;opacity:.75}.tab-close:hover{opacity:1}.sql-panel{position:relative}.sql-top{display:flex;align-items:center;gap:9px;margin-bottom:10px}.sql-top select{border:1px solid var(--line);border-radius:6px;padding:7px;background:#fff}.sql-editor-wrap{position:relative}.sql-editor{display:block;width:100%;min-height:210px;resize:vertical;border:1px solid var(--line);border-radius:7px;padding:11px;font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}.sql-suggestions{position:absolute;z-index:4;left:10px;bottom:10px;min-width:260px;max-height:190px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:7px;box-shadow:0 8px 24px #10204033}.sql-suggestion{display:block;width:100%;border-radius:0;text-align:left;background:#fff;color:var(--ink);font:12px ui-monospace,SFMono-Regular,Consolas,monospace}.sql-suggestion:hover{background:#edf4ff}.sql-result{margin-top:13px}.sql-message{color:var(--muted);margin:0 0 9px}#workspace{height:calc(100vh - 50px);display:flex;flex-direction:column;min-height:0}#workspace>.toolbar,#workspace>.tab-bar{flex:0 0 auto}#tablePanel{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}#tablePanel .table-wrap{flex:1 1 auto;min-height:0;max-height:none}#tablePanel .pager{flex:0 0 auto;background:var(--panel);margin-top:10px;padding-top:3px}.sql-suggestion{display:flex;justify-content:space-between;gap:12px}.sql-suggestion.active{background:#dceaff;color:#0d4fa8}.suggestion-kind{color:var(--muted);font-family:system-ui,sans-serif}@media(max-width:720px){#workspace{height:auto;min-height:0}#tablePanel{min-height:420px}}
@@ -36,11 +38,11 @@ select{appearance:none!important;padding-right:32px!important;background-image:l
 <dialog id="backupDatabaseDialog"><h2 class="modal-title">备份下载数据库</h2><p class="hint">选择一个数据库，系统将生成 .sql.gz 备份文件。</p><div class="form-grid"><label>数据库</label><select id="backupDatabaseName"></select></div><div class="modal-actions"><button type="button" class="secondary" id="cancelBackupDatabase">取消</button><button type="button" id="confirmBackupDatabase">开始备份</button></div></dialog>
 <dialog id="deleteDatabaseDialog"><h2 class="modal-title">删除数据库</h2><p class="hint">此操作会永久删除数据库内的全部表和数据。请重新输入当前 MySQL 连接密码。</p><div class="form-grid"><label>数据库</label><select id="deleteDatabaseName"></select><label>当前连接密码</label><input id="deleteDatabasePassword" type="password" autocomplete="current-password" required></div><div class="modal-actions"><button type="button" class="secondary" id="cancelDeleteDatabase">取消</button><button type="button" class="danger" id="confirmDeleteDatabase" disabled>请等待 3 秒</button></div></dialog>
 <dialog id="deleteTableDialog"><h2 class="modal-title">删除此表</h2><p class="hint" id="deleteTableMessage"></p><div class="form-grid"><label>当前连接密码</label><input id="deleteTablePassword" type="password" autocomplete="current-password" required></div><div class="modal-actions"><button type="button" class="secondary" id="cancelDeleteTable">取消</button><button type="button" class="danger" id="confirmDeleteTable" disabled>请等待 3 秒</button></div></dialog>
-<dialog id="createTableDialog" class="table-designer-dialog"><form id="createTableForm"><header class="table-designer-header"><h2>创建表</h2><div class="table-designer-meta"><label>数据库 <select id="createTableSchema" required></select></label><label>表名 <input id="newTableName" required maxlength="64" pattern="[A-Za-z0-9_$]+" placeholder="例如：users"></label></div></header><div class="table-designer-toolbar" role="toolbar" aria-label="字段操作"><button type="submit" class="designer-save">保存</button><span class="designer-separator"></span><button type="button" id="addTableColumn">添加字段</button><button type="button" id="insertTableColumn">插入字段</button><button type="button" id="deleteTableColumn">删除字段</button><span class="designer-separator"></span><button type="button" id="toggleTablePrimary">主键</button><span class="designer-separator"></span><button type="button" id="moveTableColumnUp">上移</button><button type="button" id="moveTableColumnDown">下移</button><span class="designer-toolbar-spacer"></span><button type="button" class="secondary" id="cancelCreateTable">取消</button></div><div class="table-designer-tabs" role="tablist" aria-label="表设计器"><button type="button" class="active" data-designer-tab="fields">字段</button><button type="button" data-designer-tab="indexes">索引</button><button type="button" data-designer-tab="foreign">外键</button><button type="button" data-designer-tab="triggers">触发器</button><button type="button" data-designer-tab="options">选项</button><button type="button" data-designer-tab="comments">注释</button><button type="button" data-designer-tab="sql">SQL 预览</button></div><section class="table-designer-panel" data-designer-panel="fields"><div class="table-designer-grid-wrap"><table class="table-designer-grid"><thead><tr><th></th><th>名</th><th>类型</th><th>长度</th><th>小数点</th><th>不是 null</th><th>虚拟</th><th>键</th><th>注释</th></tr></thead><tbody id="createTableColumns"></tbody></table></div></section><section class="table-designer-panel hidden" data-designer-panel="indexes"><p class="designer-note">主键在“字段”页中选择；创建完成后可在数据表的“管理索引”功能中添加普通、唯一及全文索引。</p></section><section class="table-designer-panel hidden" data-designer-panel="foreign"><p class="designer-note">外键需要引用表和字段的完整定义。请先创建数据表，再通过 SQL 控制台或表设计功能添加外键。</p></section><section class="table-designer-panel hidden" data-designer-panel="triggers"><p class="designer-note">触发器需要定义触发时机、事件与 SQL 语句。请先创建数据表，再通过 SQL 控制台创建触发器。</p></section><section class="table-designer-panel hidden" data-designer-panel="options"><div class="table-designer-options"><label>存储引擎 <select id="createTableEngine"><option value="InnoDB" selected>InnoDB</option><option value="MyISAM">MyISAM</option><option value="MEMORY">MEMORY</option></select></label><label>字符集 <select id="createTableCharset"><option value="">使用数据库默认值</option><option value="utf8mb4">utf8mb4</option><option value="utf8">utf8</option><option value="latin1">latin1</option></select></label><label>排序规则 <input id="createTableCollation" maxlength="64" placeholder="例如：utf8mb4_unicode_ci"></label></div></section><section class="table-designer-panel hidden" data-designer-panel="comments"><label class="table-designer-comment">表注释<textarea id="createTableComment" maxlength="2048" placeholder="为这张表添加说明（可选）"></textarea></label><p class="designer-note">字段注释可直接在“字段”页最后一列填写。</p></section><section class="table-designer-panel hidden" data-designer-panel="sql"><pre id="createTableSQLPreview" class="table-designer-sql"></pre></section></form></dialog>
-<dialog id="connectDialog"><h2 class="modal-title">连接 MySQL</h2><p class="hint">输入 MySQL 服务器 IP（或主机名）后，系统会读取可访问的数据库和表。</p><form id="connectionForm"><div class="form-grid"><label>已保存连接</label><select id="savedConnectionSelect"><option value="">选择连接…</option></select><label>连接名称</label><input id="connectionName" maxlength="64" placeholder="例如：生产库"><label>服务器 IP / 主机名</label><input id="dbHost" placeholder="例如 192.168.1.10" required autofocus><label>端口</label><input id="dbPort" type="number" value="3306" min="1" max="65535" required><label>用户名</label><input id="dbUser" value="root" required><label>密码</label><input id="dbPassword" type="password"><span></span><label class="remember-login"><input id="rememberConnection" type="checkbox">记住登录信息</label></div><div class="modal-actions"><button type="submit">连接</button></div></form></dialog>
+<dialog id="createTableDialog" class="table-designer-dialog"><form id="createTableForm"><header class="table-designer-header"><h2>创建表</h2><div class="table-designer-meta"><label>数据库 <select id="createTableSchema" required></select></label><label>表名 <input id="newTableName" required maxlength="64" pattern="[A-Za-z0-9_$]+" placeholder="例如：users"></label></div></header><div class="table-designer-toolbar" role="toolbar" aria-label="字段操作"><button type="submit" class="designer-save">保存</button><span class="designer-separator"></span><button type="button" id="addTableColumn">添加字段</button><button type="button" id="insertTableColumn">插入字段</button><button type="button" id="deleteTableColumn">删除字段</button><span class="designer-separator"></span><button type="button" id="toggleTablePrimary">主键</button><span class="designer-separator"></span><button type="button" id="moveTableColumnUp">上移</button><button type="button" id="moveTableColumnDown">下移</button><span class="designer-toolbar-spacer"></span><button type="button" class="secondary" id="cancelCreateTable">取消</button></div><div class="table-designer-tabs" role="tablist" aria-label="表设计器"><button type="button" class="active" data-designer-tab="fields">字段</button><button type="button" data-designer-tab="indexes">索引</button><button type="button" data-designer-tab="foreign">外键</button><button type="button" data-designer-tab="triggers">触发器</button><button type="button" data-designer-tab="options">选项</button><button type="button" data-designer-tab="comments">注释</button><button type="button" data-designer-tab="sql">SQL 预览</button></div><section class="table-designer-panel" data-designer-panel="fields"><div class="table-designer-grid-wrap"><table class="table-designer-grid"><thead><tr><th></th><th>名</th><th>类型</th><th>长度</th><th>小数点</th><th>不是 null</th><th>虚拟</th><th>键</th><th>注释</th></tr></thead><tbody id="createTableColumns"></tbody></table></div></section><section class="table-designer-panel hidden" data-designer-panel="indexes"><p class="designer-note">主键在“字段”页中选择；创建完成后可在数据表的“管理索引”功能中添加普通、唯一及全文索引。</p></section><section class="table-designer-panel hidden" data-designer-panel="foreign"><p class="designer-note">外键需要引用表和字段的完整定义。请先创建数据表，再通过 SQL 控制台或表设计功能添加外键。</p></section><section class="table-designer-panel hidden" data-designer-panel="triggers"><p class="designer-note">触发器需要定义触发时机、事件与 SQL 语句。请先创建数据表，再通过 SQL 控制台创建触发器。</p></section><section class="table-designer-panel hidden" data-designer-panel="options"><div class="table-designer-options"><label>存储引擎 <select id="createTableEngine"><option value="InnoDB" selected>InnoDB</option><option value="MyISAM">MyISAM</option><option value="MEMORY">MEMORY</option></select></label><label>字符集 <select id="createTableCharset"><option value="">使用数据库默认值</option><option value="utf8mb4">utf8mb4</option><option value="utf8">utf8</option><option value="latin1">latin1</option></select></label><label>排序规则 <select id="createTableCollation"><option value="">使用数据库默认值</option><option value="utf8mb4_general_ci">utf8mb4_general_ci</option><option value="utf8mb4_unicode_ci">utf8mb4_unicode_ci</option><option value="utf8mb4_0900_ai_ci">utf8mb4_0900_ai_ci</option><option value="utf8_general_ci">utf8_general_ci</option><option value="utf8_unicode_ci">utf8_unicode_ci</option><option value="latin1_swedish_ci">latin1_swedish_ci</option></select></label></div></section><section class="table-designer-panel hidden" data-designer-panel="comments"><label class="table-designer-comment">表注释<textarea id="createTableComment" maxlength="2048" placeholder="为这张表添加说明（可选）"></textarea></label><p class="designer-note">字段注释可直接在“字段”页最后一列填写。</p></section><section class="table-designer-panel hidden" data-designer-panel="sql"><pre id="createTableSQLPreview" class="table-designer-sql"></pre></section></form></dialog>
+<dialog id="connectDialog"><h2 class="modal-title">连接 MySQL</h2><p class="hint">输入 MySQL 服务器 IP（或主机名）后，系统会读取可访问的数据库和表。</p><form id="connectionForm" autocomplete="off"><div class="form-grid"><label>已保存连接</label><select id="savedConnectionSelect"><option value="">选择连接…</option></select><label>连接名称</label><input id="connectionName" maxlength="64" placeholder="例如：生产库" autocomplete="off"><label>服务器 IP / 主机名</label><input id="dbHost" placeholder="例如 192.168.1.10" required autofocus autocomplete="off"><label>端口</label><input id="dbPort" type="number" value="3306" min="1" max="65535" required autocomplete="off"><label>用户名</label><input id="dbUser" value="root" required autocomplete="off"><label>密码</label><input id="dbPassword" type="password" autocomplete="new-password"><span></span><label class="remember-login"><input id="rememberConnection" type="checkbox">记住登录信息</label></div><div class="modal-actions"><button type="submit">连接</button></div></form></dialog>
 <dialog id="editDialog"><h2 class="modal-title">编辑记录</h2><p class="hint">带主键的字段用于定位记录，不能在此修改；没有主键时使用原始行数据定位，完全重复的行可能同时受影响。</p><form id="editForm"><div class="form-grid" id="formFields"></div><div class="modal-actions"><button type="button" class="secondary" id="cancelEdit">取消</button><button type="submit">保存</button></div></form></dialog>
 <dialog id="columnTypeDialog"><h2 class="modal-title">修改此表</h2><p class="hint">选择 MySQL 类型模板后可继续调整参数。当表中存在历史数据时，系统会在修改前请您确认。</p><form id="columnTypeForm"><div class="form-grid"><label>字段</label><select id="columnTypeColumn"></select><label>快速选择</label><select id="columnTypePreset"></select><label>类型定义</label><input id="columnTypeInput" required maxlength="256" placeholder="例：VARCHAR(255)"></div><div class="modal-actions"><button type="button" class="secondary" id="cancelColumnType">取消</button><button type="submit">更新类型</button></div></form><hr><h3>新增字段</h3><div class="form-grid"><label>字段名称</label><input id="addFieldName" maxlength="64" placeholder="例如：status"><label>快捷类型</label><select id="addFieldPreset"></select><label>类型定义</label><input id="addFieldType" maxlength="256" value="VARCHAR(255)"><label>约束</label><label class="inline-check"><input id="addFieldNullable" type="checkbox" checked> 允许 NULL</label></div><div class="modal-actions"><button type="button" id="addFieldBtn">新增字段</button></div><h3>删除字段</h3><div class="form-grid"><label>字段</label><select id="deleteFieldColumn"></select></div><div class="modal-actions"><button type="button" class="danger" id="deleteFieldBtn">删除字段</button></div><hr><h3>创建索引</h3><div class="form-grid"><label>索引名称</label><input id="newIndexName" maxlength="64" placeholder="例如：idx_name"><label>索引类型</label><select id="newIndexType"><option value="INDEX">普通索引</option><option value="UNIQUE">唯一索引</option><option value="FULLTEXT">全文索引</option><option value="SPATIAL">空间索引</option></select><label>索引字段</label><div class="index-columns" id="newIndexColumns"></div></div><div class="modal-actions"><button type="button" id="createIndexBtn">创建索引</button></div><h3>已有索引</h3><div class="existing-indexes" id="existingIndexes"></div></dialog>
-<dialog id="importDialog"><h2 class="modal-title">导入 SQL</h2><p class="hint">请选择导入目标数据库。备份脚本中的建库和切库语句会被忽略，数据会导入到这里；同名表可能被备份脚本替换。</p><form id="importForm"><div class="form-grid"><label for="importTargetSchema">目标数据库</label><select id="importTargetSchema" required></select></div><input id="sqlFile" type="file" accept=".sql,.sql.gz,.gz,text/sql,application/gzip,application/x-gzip" required><p class="hint"><label><input id="importCompatibilityMode" type="checkbox"> 兼容模式：临时关闭严格模式，允许导入历史数据中的范围截断值（例如数值超出字段范围）。</label></p><div class="modal-actions"><button type="button" class="secondary" id="cancelImport">取消</button><button type="submit">开始导入</button></div></form></dialog><dialog id="exportDialog"><h2 class="modal-title">导出结构和数据</h2><p class="hint">是否导出当前筛选结果？</p><div class="modal-actions"><button type="button" class="secondary" id="cancelExport">取消</button><button type="button" class="secondary" id="exportAllBtn">导出当前表全部数据</button><button type="button" id="exportFilteredBtn">确认导出当前筛选结果</button></div></dialog><dialog id="sqlExportDialog"><h2 class="modal-title">导出 SQL 查询结果</h2><p class="hint">将导出该 SQL 查询匹配的全部记录，不受当前分页限制。</p><label class="sql-export-select-all"><input id="sqlExportSelectAll" type="checkbox" checked> 全选字段</label><div class="sql-export-fields" id="sqlExportFields"></div><div class="modal-actions"><button type="button" class="secondary" id="cancelSqlExport">取消</button><button type="button" id="confirmSqlExport">导出 CSV</button></div></dialog><dialog id="sqlPasswordDialog"><h2 class="modal-title">验证当前连接密码</h2><p class="hint">执行删除或清空数据的 SQL 前，请重新输入当前 MySQL 连接密码。</p><div class="form-grid"><label>当前连接密码</label><input id="sqlPasswordInput" type="password" autocomplete="current-password"></div><div class="modal-actions"><button type="button" class="secondary" id="cancelSqlPassword">取消</button><button type="button" id="confirmSqlPassword">确认执行</button></div></dialog><div class="backup-overlay hidden" id="backupOverlay"><div class="backup-card"><h2>正在备份数据库</h2><progress id="backupProgress"></progress><p id="backupStatus">正在创建一致性快照…</p></div></div><div class="backup-overlay hidden" id="transferOverlay"><div class="backup-card"><h2 id="transferTitle">正在传输文件</h2><progress id="transferProgress" max="100" value="0"></progress><p id="transferStatus">正在准备…</p></div></div><dialog id="errorDialog"><h2 class="modal-title" id="errorDialogTitle">操作失败</h2><p id="errorDialogMessage" style="white-space:pre-wrap;word-break:break-word"></p><div class="modal-actions"><button type="button" id="closeErrorDialog">关闭</button></div></dialog><div class="toast" id="toast"></div><div class="tab-context-menu hidden" id="tabContextMenu"><button data-tab-menu="close">关闭当前</button><button data-tab-menu="others">关闭非当前</button><button data-tab-menu="left">关闭左边所有</button><button data-tab-menu="right">关闭右边所有</button></div><div class="table-context-menu hidden" id="tableContextMenu"><button data-table-menu="create">创建表</button><button data-table-menu="design">设计表</button><button data-table-menu="delete" class="danger-item">删除表</button><button data-table-menu="truncate" class="danger-item">清空表</button><button data-table-menu="rename">重命名</button></div><dialog id="renameTableDialog"><h2 class="modal-title">重命名数据表</h2><div class="form-grid"><label>新表名</label><input id="renameTableName" maxlength="64" pattern="[A-Za-z0-9_$]+" placeholder="例如：users_archive"></div><div class="modal-actions"><button type="button" class="secondary" id="cancelRenameTable">取消</button><button type="button" id="confirmRenameTable">确认重命名</button></div></dialog><dialog id="createTableSQLDialog"><h2 class="modal-title">创建表语句</h2><textarea id="createTableSQLText" class="sql-create-view" readonly></textarea><div class="modal-actions"><button type="button" class="secondary" id="closeCreateTableSQL">关闭</button></div></dialog><dialog id="saveSqlDialog"><h2 class="modal-title">保存 SQL 查询</h2><div class="form-grid"><label>查询名称</label><input id="savedSqlName" maxlength="64" placeholder="例如：本月订单"><label>数据库</label><select id="savedSqlSchema"></select></div><div class="modal-actions"><button type="button" class="secondary" id="cancelSaveSql">取消</button><button type="button" id="confirmSaveSql">保存</button></div></dialog><dialog id="savedSqlDialog"><h2 class="modal-title">快速查询</h2><p class="hint">选择已保存的查询后，SQL 控制台会恢复对应内容。</p><select id="savedSqlSelect" style="width:100%"></select><div class="modal-actions"><button type="button" class="secondary" id="cancelSavedSql">取消</button><button type="button" id="applySavedSql">应用查询</button></div></dialog>
+<dialog id="importDialog"><h2 class="modal-title">导入 SQL</h2><p class="hint">请选择导入目标数据库。备份脚本中的建库和切库语句会被忽略，数据会导入到这里；同名表可能被备份脚本替换。</p><form id="importForm"><div class="form-grid"><label for="importTargetSchema">目标数据库</label><select id="importTargetSchema" required></select></div><div class="file-picker"><input id="sqlFile" type="file" accept=".sql,.sql.gz,.gz,text/sql,application/gzip,application/x-gzip" tabindex="-1"><label for="sqlFile" class="file-picker-button">选择 SQL 文件</label><span id="sqlFileName" class="file-picker-name">尚未选择文件</span></div><p class="hint" id="importCompatibilityHint">已默认开启兼容导入：临时关闭严格模式，兼容历史数据中的范围截断值。</p><div class="modal-actions"><button type="button" class="secondary" id="cancelImport">取消</button><button type="submit">开始导入</button></div></form></dialog><dialog id="exportDialog"><h2 class="modal-title">导出结构和数据</h2><p class="hint">是否导出当前筛选结果？</p><div class="modal-actions"><button type="button" class="secondary" id="cancelExport">取消</button><button type="button" class="secondary" id="exportAllBtn">导出当前表全部数据</button><button type="button" id="exportFilteredBtn">确认导出当前筛选结果</button></div></dialog><dialog id="sqlExportDialog"><h2 class="modal-title">导出 SQL 查询结果</h2><p class="hint">将导出该 SQL 查询匹配的全部记录，不受当前分页限制。</p><label class="sql-export-select-all"><input id="sqlExportSelectAll" type="checkbox" checked> 全选字段</label><div class="sql-export-fields" id="sqlExportFields"></div><div class="modal-actions"><button type="button" class="secondary" id="cancelSqlExport">取消</button><button type="button" id="confirmSqlExport">导出 CSV</button></div></dialog><dialog id="sqlPasswordDialog"><h2 class="modal-title">验证当前连接密码</h2><p class="hint">执行删除或清空数据的 SQL 前，请重新输入当前 MySQL 连接密码。</p><div class="form-grid"><label>当前连接密码</label><input id="sqlPasswordInput" type="password" autocomplete="current-password"></div><div class="modal-actions"><button type="button" class="secondary" id="cancelSqlPassword">取消</button><button type="button" id="confirmSqlPassword">确认执行</button></div></dialog><div class="backup-overlay hidden" id="backupOverlay"><div class="backup-card"><h2>正在备份数据库</h2><progress id="backupProgress"></progress><p id="backupStatus">正在创建一致性快照…</p></div></div><div class="backup-overlay hidden" id="transferOverlay"><div class="backup-card"><h2 id="transferTitle">正在传输文件</h2><progress id="transferProgress" max="100" value="0"></progress><p id="transferStatus">正在准备…</p></div></div><dialog id="errorDialog"><h2 class="modal-title" id="errorDialogTitle">操作失败</h2><p id="errorDialogMessage" style="white-space:pre-wrap;word-break:break-word"></p><div class="modal-actions"><button type="button" id="closeErrorDialog">确认</button></div></dialog><div class="toast" id="toast"></div><div class="tab-context-menu hidden" id="tabContextMenu"><button data-tab-menu="close">关闭当前</button><button data-tab-menu="others">关闭非当前</button><button data-tab-menu="left">关闭左边所有</button><button data-tab-menu="right">关闭右边所有</button></div><div class="table-context-menu hidden" id="tableContextMenu"><button data-table-menu="create">创建表</button><button data-table-menu="design">设计表</button><button data-table-menu="delete" class="danger-item">删除表</button><button data-table-menu="truncate" class="danger-item">清空表</button><button data-table-menu="rename">重命名</button></div><dialog id="renameTableDialog"><h2 class="modal-title">重命名数据表</h2><div class="form-grid"><label>新表名</label><input id="renameTableName" maxlength="64" pattern="[A-Za-z0-9_$]+" placeholder="例如：users_archive"></div><div class="modal-actions"><button type="button" class="secondary" id="cancelRenameTable">取消</button><button type="button" id="confirmRenameTable">确认重命名</button></div></dialog><dialog id="createTableSQLDialog"><h2 class="modal-title">创建表语句</h2><textarea id="createTableSQLText" class="sql-create-view" readonly></textarea><div class="modal-actions"><button type="button" class="secondary" id="closeCreateTableSQL">关闭</button></div></dialog><dialog id="saveSqlDialog"><h2 class="modal-title">保存 SQL 查询</h2><p class="hint" id="savedSqlConnectionHint"></p><div class="form-grid"><label>查询名称</label><input id="savedSqlName" maxlength="64" placeholder="例如：本月订单"><label>运行数据库</label><select id="savedSqlSchema"></select></div><div class="modal-actions"><button type="button" class="secondary" id="cancelSaveSql">取消</button><button type="button" id="confirmSaveSql">保存</button></div></dialog><dialog id="savedSqlDialog"><h2 class="modal-title">快速查询</h2><p class="hint">已按连接信息分组。应用后会回填连接资料、运行数据库和 SQL。</p><select id="savedSqlSelect" style="width:100%"></select><p class="hint saved-sql-selection" id="savedSqlSelection"></p><div class="modal-actions"><button type="button" class="secondary" id="cancelSavedSql">取消</button><button type="button" id="applySavedSql">应用查询</button></div></dialog>
 <script>
 const state={schema:'',table:'',columns:[],primaryKeys:[],filters:[],filterLogic:'AND',sortColumn:'',sortDirection:'',offset:0,limit:100,page:0,cursors:[''],cursorMode:false,connected:false,databases:[],tabs:[],activeKey:'',view:'table',sqlTabs:[],activeSqlKey:'',sqlSequence:0,sqlSchema:'',sqlOffset:0,sqlLimit:100,sqlHasMore:false,sqlLastResult:null};const $=id=>document.getElementById(id);
 async function api(path,options={}){let response;try{response=await fetch(path,options)}catch(error){serviceClosed();throw new Error('EXE 服务已关闭，请重新启动程序后再试')}const type=response.headers.get('content-type')||'';const result=type.includes('application/json')?await response.json():await response.text();if(!response.ok){const error=new Error(result.error||result.message||'请求失败');error.payload=result;throw error}return result}
@@ -91,12 +93,12 @@ function sqlRequiresPassword(sql){return /(delete|drop|truncate)/i.test(sql)}
 function requestSQLPassword(){return new Promise(resolve=>{const dialog=$('sqlPasswordDialog'),input=$('sqlPasswordInput');input.value='';const finish=value=>{dialog.close();resolve(value)};$('cancelSqlPassword').onclick=()=>finish(null);$('confirmSqlPassword').onclick=()=>finish(input.value);dialog.showModal();input.focus()})}
 async function runSQL(reset=true){const sql=$('sqlEditor').value;if(!sql.trim()){notice('请输入 SQL');return}if(reset)state.sqlOffset=0;state.sqlLimit=Math.max(1,Math.min(500,Number($('sqlLimit').value)||100));$('sqlLimit').value=state.sqlLimit;let password='';if(sqlRequiresPassword(sql)){password=await requestSQLPassword();if(password===null)return}try{const result=await api('/api/sql',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema:state.sqlSchema,sql,limit:state.sqlLimit,offset:state.sqlOffset,password})});state.sqlLastResult=result;renderSQLResult(result);saveSQLTab()}catch(e){notice(e.message)}}
 function openSQLExport(){const result=state.sqlLastResult;if(!result||!result.columns){notice('请先执行返回记录的 SQL 查询');return}const box=$('sqlExportFields');box.innerHTML=result.columns.map((column,index)=>`<label class="sql-export-field"><input type="checkbox" data-sql-export-column="${esc(column)}" checked><span title="${esc(column)}">${esc(column)}</span></label>`).join('');const all=$('sqlExportSelectAll');all.checked=true;all.onchange=()=>box.querySelectorAll('[data-sql-export-column]').forEach(input=>input.checked=all.checked);box.querySelectorAll('[data-sql-export-column]').forEach(input=>input.onchange=()=>{all.checked=[...box.querySelectorAll('[data-sql-export-column]')].every(item=>item.checked)});$('sqlExportDialog').showModal()}
-async function exportSQLQuery(){const columns=[...document.querySelectorAll('[data-sql-export-column]:checked')].map(input=>input.dataset.sqlExportColumn);if(!columns.length){notice('请至少选择一个导出字段');return}try{const response=await fetch('/api/sql-export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema:state.sqlSchema,sql:$('sqlEditor').value,columns})});if(!response.ok){const payload=await response.json().catch(()=>({}));throw new Error(payload.error||payload.message||'导出失败')}const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='sql_query.csv';document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);$('sqlExportDialog').close();notice('查询结果已开始下载（导出全部匹配记录）')}catch(error){notice(error.message)}}
+async function exportSQLQuery(){const columns=[...document.querySelectorAll('[data-sql-export-column]:checked')].map(input=>input.dataset.sqlExportColumn);if(!columns.length){notice('请至少选择一个导出字段');return}try{const result=await api('/api/sql-export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema:state.sqlSchema,sql:$('sqlEditor').value,columns})});$('sqlExportDialog').close();showErrorDialog('导出完成',`文件已保存到 EXE 同目录：\n${result.path}`)}catch(error){showErrorDialog('导出失败',error.message)}}
 function editRow(row){const fields=$('formFields');fields.innerHTML=state.columns.map(c=>{const pk=state.primaryKeys.includes(c.name),value=row[c.name]??'';return `<label>${esc(c.name)}${pk?'（主键）':''}</label><div class="field-editor"><input data-field="${esc(c.name)}" value="${esc(value)}" ${pk?'disabled':''}><span class="field-type">${esc(c.type)}</span></div>`}).join('');$('editForm').onsubmit=async ev=>{ev.preventDefault();const data={},primaryKey=rowLocator(row);fields.querySelectorAll('input').forEach(input=>{const name=input.dataset.field;if(!state.primaryKeys.includes(name))data[name]=input.value});try{await api('/api/row',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema:state.schema,table:state.table,primaryKey,data})});$('editDialog').close();notice('已保存');loadRows()}catch(e){notice(e.message)}};$('editDialog').showModal()}
 async function deleteRow(row){if(!confirm('确定删除这条记录吗？此操作无法撤销。'))return;const primaryKey=rowLocator(row);try{await api('/api/row',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema:state.schema,table:state.table,primaryKey})});notice('已删除');loadRows()}catch(e){notice(e.message)}}
-function download(data,filtered=false){const query=new URLSearchParams({schema:state.schema,table:state.table,data:data?'1':'0'});if(filtered){const filters=activeFilters();if(filters.length)query.set('filters',JSON.stringify(filters));if(filters.length>1)query.set('filterLogic',state.filterLogic)}window.location.href='/api/export?'+query}
-async function connectionState(){try{const r=await api('/api/connection');$('dbHost').value=r.host||'';$('dbPort').value=r.port||'3306';$('dbUser').value=r.user||'root';$('dbPassword').value=r.passwordDefault||'';if(r.connected){state.connected=true;setConnectionButton(true);$('connectionText').textContent=`${r.host}:${r.port} · ${r.user}`;loadTree()}else $('connectDialog').showModal()}catch(e){notice(e.message)}}
-$('connectionForm').onsubmit=async e=>{e.preventDefault();const body={host:$('dbHost').value,port:$('dbPort').value,user:$('dbUser').value,password:$('dbPassword').value};try{const r=await api('/api/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});saveRememberedConnection(body);state.connected=true;setConnectionButton(true);state.tabs=[];state.activeKey='';state.sqlTabs=[];state.activeSqlKey='';state.sqlLastResult=null;state.schema='';state.table='';state.columns=[];state.primaryKeys=[];state.filters=[];state.filterLogic='AND';$('connectionText').textContent=`${r.host}:${r.port} · ${r.user}`;$('connectDialog').close();$('workspace').classList.add('hidden');$('empty').classList.remove('hidden');notice(r.message);loadTree()}catch(err){notice(err.message)}};$('connectBtn').onclick=()=>$('connectDialog').showModal();$('sqlBtn').onclick=openSQL;$('addFilterBtn').onclick=()=>{if(!state.columns.length)return;state.filters.push({column:state.columns[0].name,operator:'contains',value:''});renderFilters()};$('filterBtn').onclick=()=>{resetPaging();loadRows()};$('clearBtn').onclick=()=>{state.filters=[];renderFilters();resetPaging();loadRows()};$('prevBtn').onclick=()=>{if(state.page===0)return;state.page--;if(!state.cursorMode)state.offset=Math.max(0,state.offset-state.limit);loadRows()};$('nextBtn').onclick=()=>{state.page++;if(!state.cursorMode)state.offset+=state.limit;loadRows()};$('cancelEdit').onclick=()=>$('editDialog').close();$('importBtn').onclick=async()=>{if(!state.databases.length)await loadTree();const target=$('importTargetSchema');target.replaceChildren(...state.databases.map(database=>new Option(database,database)));const preferred=state.schema||state.sqlSchema||state.databases[0]||'';target.value=preferred;if(!target.value){notice('请先连接并选择或创建一个数据库');return}$('importDialog').showModal()};$('cancelImport').onclick=()=>$('importDialog').close();$('exportBtn').onclick=()=>{if($('exportMode').value==='structure')download(false);else $('exportDialog').showModal()};$('cancelExport').onclick=()=>$('exportDialog').close();$('exportFilteredBtn').onclick=()=>{$('exportDialog').close();download(true,true)};$('exportAllBtn').onclick=()=>{$('exportDialog').close();download(true)};$('importForm').onsubmit=async e=>{e.preventDefault();const file=$('sqlFile').files[0];if(!file)return;const form=new FormData();form.append('schema',state.schema);form.append('file',file);try{await api('/api/import',{method:'POST',body:form});$('importDialog').close();notice('导入完成');loadTree();loadRows()}catch(err){notice(err.message)}};$('sqlSchema').onchange=e=>{state.sqlSchema=e.target.value;saveSQLTab();hideSuggestions()};$('runSqlBtn').onclick=()=>runSQL(true);$('sqlLimit').onchange=()=>runSQL(true);$('cancelSqlExport').onclick=()=>$('sqlExportDialog').close();$('confirmSqlExport').onclick=exportSQLQuery;$('sqlPrevBtn').onclick=()=>{if(state.sqlOffset===0)return;state.sqlOffset=Math.max(0,state.sqlOffset-state.sqlLimit);runSQL(false)};$('sqlNextBtn').onclick=()=>{if(!state.sqlHasMore)return;state.sqlOffset+=state.sqlLimit;runSQL(false)};initSidebarResizer();$('sqlEditor').oninput=()=>{saveSQLTab();requestCompletion()};$('sqlEditor').onkeydown=e=>{const visible=!$('sqlSuggestions').classList.contains('hidden');if(visible&&completionItems.length&&e.key==='ArrowDown'){e.preventDefault();completionIndex=(completionIndex+1)%completionItems.length;renderSuggestions()}else if(visible&&completionItems.length&&e.key==='ArrowUp'){e.preventDefault();completionIndex=(completionIndex-1+completionItems.length)%completionItems.length;renderSuggestions()}else if(visible&&completionIndex>=0&&e.key==='Enter'&&!e.ctrlKey){e.preventDefault();applySuggestion(completionItems[completionIndex].value)}else if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();runSQL(true)}else if(e.key==='Escape')hideSuggestions()};connectionState();
+async function download(data,filtered=false){const query=new URLSearchParams({schema:state.schema,table:state.table,data:data?'1':'0'});if(filtered){const filters=activeFilters();if(filters.length)query.set('filters',JSON.stringify(filters));if(filters.length>1)query.set('filterLogic',state.filterLogic)}try{const result=await api('/api/export?'+query);showErrorDialog('导出完成',`文件已保存到 EXE 同目录：\n${result.path}`)}catch(error){showErrorDialog('导出失败',error.message)}}
+async function connectionState(){try{const r=await api('/api/connection');$('dbHost').value=r.host||'';$('dbPort').value=r.port||'3306';$('dbUser').value=r.user||'root';$('dbPassword').value='';if(r.connected){state.connected=true;setConnectionButton(true);$('connectionText').textContent=`${r.host}:${r.port} · ${r.user}`;if(r.permissions){accountPermissionSnapshot=r.permissions;if(typeof applyPermissionVisibility==='function')applyPermissionVisibility()}loadTree()}else $('connectDialog').showModal()}catch(e){notice(e.message)}}
+$('connectionForm').onsubmit=async e=>{e.preventDefault();const body={host:$('dbHost').value,port:$('dbPort').value,user:$('dbUser').value,password:$('dbPassword').value};try{const r=await api('/api/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});saveRememberedConnection(body);state.connected=true;setConnectionButton(true);state.tabs=[];state.activeKey='';state.sqlTabs=[];state.activeSqlKey='';state.sqlLastResult=null;state.schema='';state.table='';state.columns=[];state.primaryKeys=[];state.filters=[];state.filterLogic='AND';$('connectionText').textContent=`${r.host}:${r.port} · ${r.user}`;$('connectDialog').close();$('workspace').classList.add('hidden');$('empty').classList.remove('hidden');notice(r.message);loadTree()}catch(err){notice(err.message)}};$('connectBtn').onclick=()=>$('connectDialog').showModal();$('sqlBtn').onclick=openSQL;$('addFilterBtn').onclick=()=>{if(!state.columns.length)return;state.filters.push({column:state.columns[0].name,operator:'contains',value:''});renderFilters()};$('filterBtn').onclick=()=>{resetPaging();loadRows()};$('clearBtn').onclick=()=>{state.filters=[];renderFilters();resetPaging();loadRows()};$('prevBtn').onclick=()=>{if(state.page===0)return;state.page--;if(!state.cursorMode)state.offset=Math.max(0,state.offset-state.limit);loadRows()};$('nextBtn').onclick=()=>{state.page++;if(!state.cursorMode)state.offset+=state.limit;loadRows()};$('cancelEdit').onclick=()=>$('editDialog').close();$('importBtn').onclick=async()=>{if(!state.databases.length)await loadTree();const target=$('importTargetSchema');target.replaceChildren(...state.databases.map(database=>new Option(database,database)));const preferred=state.schema||state.sqlSchema||state.databases[0]||'';target.value=preferred;if(!target.value){notice('请先连接并选择或创建一个数据库');return}$('importDialog').showModal()};$('cancelImport').onclick=()=>$('importDialog').close();$('exportBtn').onclick=()=>{if($('exportMode').value==='structure')download(false);else $('exportDialog').showModal()};$('cancelExport').onclick=()=>$('exportDialog').close();$('exportFilteredBtn').onclick=()=>{$('exportDialog').close();download(true,true)};$('exportAllBtn').onclick=()=>{$('exportDialog').close();download(true)};$('sqlFile').onchange=()=>{$('sqlFileName').textContent=$('sqlFile').files[0]?.name||'尚未选择文件'};$('importForm').onsubmit=async e=>{e.preventDefault();const file=$('sqlFile').files[0];if(!file)return;const form=new FormData();form.append('schema',state.schema);form.append('file',file);try{await api('/api/import',{method:'POST',body:form});$('importDialog').close();notice('导入完成');loadTree();loadRows()}catch(err){notice(err.message)}};$('sqlSchema').onchange=e=>{state.sqlSchema=e.target.value;saveSQLTab();hideSuggestions()};$('runSqlBtn').onclick=()=>runSQL(true);$('sqlLimit').onchange=()=>runSQL(true);$('cancelSqlExport').onclick=()=>$('sqlExportDialog').close();$('confirmSqlExport').onclick=exportSQLQuery;$('sqlPrevBtn').onclick=()=>{if(state.sqlOffset===0)return;state.sqlOffset=Math.max(0,state.sqlOffset-state.sqlLimit);runSQL(false)};$('sqlNextBtn').onclick=()=>{if(!state.sqlHasMore)return;state.sqlOffset+=state.sqlLimit;runSQL(false)};initSidebarResizer();$('sqlEditor').oninput=()=>{saveSQLTab();requestCompletion()};$('sqlEditor').onkeydown=e=>{const visible=!$('sqlSuggestions').classList.contains('hidden');if(visible&&completionItems.length&&e.key==='ArrowDown'){e.preventDefault();completionIndex=(completionIndex+1)%completionItems.length;renderSuggestions()}else if(visible&&completionItems.length&&e.key==='ArrowUp'){e.preventDefault();completionIndex=(completionIndex-1+completionItems.length)%completionItems.length;renderSuggestions()}else if(visible&&completionIndex>=0&&e.key==='Enter'&&!e.ctrlKey){e.preventDefault();applySuggestion(completionItems[completionIndex].value)}else if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();runSQL(true)}else if(e.key==='Escape')hideSuggestions()};connectionState();
 </script>
 <script>
 const mysqlTypePresets=[
@@ -185,11 +187,11 @@ $('openBackupDatabase').onclick=openBackupDatabase;$('cancelBackupDatabase').onc
 
 <script>
 let persistentConfig={theme:'light',connections:[],savedQueries:[]};
-async function refreshPersistentConfig(){const config=await api('/api/settings');persistentConfig={theme:config.theme||'light',connections:Array.isArray(config.connections)?config.connections:[],savedQueries:Array.isArray(config.savedQueries)?config.savedQueries:[]};renderSavedConnections();return persistentConfig}
+async function refreshPersistentConfig(){const config=await api('/api/settings');persistentConfig={theme:config.theme||'light',connections:Array.isArray(config.connections)?config.connections:[],savedQueries:Array.isArray(config.savedQueries)?config.savedQueries:[]};renderSavedConnections();try{const current=await api('/api/connection');const profile=persistentConfig.connections.find(item=>item.host===current.host&&String(item.port||'3306')===String(current.port||'3306')&&item.user===current.user);if(profile&&(!$('dbPassword').value||!$('connectionName').value))applySavedConnectionProfile(profile)}catch(error){/* Connection profile recovery is optional. */}return persistentConfig}
 async function updatePersistentConfig(mutator){const latest=await api('/api/settings');latest.connections=Array.isArray(latest.connections)?latest.connections:[];latest.savedQueries=Array.isArray(latest.savedQueries)?latest.savedQueries:[];mutator(latest);const result=await api('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(resultSafeConfig(latest))});persistentConfig={theme:result.theme||'light',connections:result.connections||[],savedQueries:result.savedQueries||[]};renderSavedConnections();return persistentConfig}
 function resultSafeConfig(config){return {theme:config.theme==='dark'?'dark':'light',connections:config.connections||[],savedQueries:config.savedQueries||[]}}
 function renderSavedConnections(){const select=$('savedConnectionSelect');if(!select)return;const previous=select.value;select.innerHTML='<option value="">选择连接…</option>'+persistentConfig.connections.map((item,index)=>`<option value="${index}">${esc(item.name)} · ${esc(item.user)}@${esc(item.host)}:${esc(item.port||'3306')}</option>`).join('');select.value=previous;select.onchange=()=>{const item=persistentConfig.connections[Number(select.value)];if(!item)return;applySavedConnectionProfile(item)}}
-async function saveCurrentConnectionProfile(){const suppliedName=$('connectionName').value.trim();if(!suppliedName&&!$('rememberConnection').checked)return;const name=suppliedName||`${$('dbUser').value.trim()}@${$('dbHost').value.trim()}:${$('dbPort').value.trim()}`;const profile={name,host:$('dbHost').value.trim(),port:$('dbPort').value.trim(),user:$('dbUser').value.trim(),password:$('dbPassword').value};try{await updatePersistentConfig(config=>{const index=config.connections.findIndex(item=>String(item.name).toLowerCase()===name.toLowerCase());if(index>=0)config.connections[index]=profile;else config.connections.push(profile)});$('connectionName').value=name;notice('连接信息已保存到 mysql-manage.json')}catch(error){notice('连接成功，但保存连接信息失败：'+error.message)}}
+async function saveCurrentConnectionProfile(){const suppliedName=$('connectionName').value.trim();if(!$('rememberConnection').checked)return;const name=suppliedName||`${$('dbUser').value.trim()}@${$('dbHost').value.trim()}:${$('dbPort').value.trim()}`;const profile={name,host:$('dbHost').value.trim(),port:$('dbPort').value.trim(),user:$('dbUser').value.trim(),password:$('dbPassword').value};try{await updatePersistentConfig(config=>{const index=config.connections.findIndex(item=>String(item.name).toLowerCase()===name.toLowerCase());if(index>=0)config.connections[index]=profile;else config.connections.push(profile)});$('connectionName').value=name;notice('连接信息已保存到 mysql-manage.json')}catch(error){notice('连接成功，但保存连接信息失败：'+error.message)}}
 $('connectionForm').onsubmit=async event=>{event.preventDefault();const body={host:$('dbHost').value,port:$('dbPort').value,user:$('dbUser').value,password:$('dbPassword').value};try{const result=await api('/api/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});await saveCurrentConnectionProfile();state.connected=true;setConnectionButton(true);state.tabs=[];state.activeKey='';state.sqlTabs=[];state.activeSqlKey='';state.sqlLastResult=null;state.schema='';state.table='';state.columns=[];state.primaryKeys=[];state.filters=[];state.filterLogic='AND';$('connectionText').textContent=`${result.host}:${result.port} · ${result.user}`;$('connectDialog').close();$('workspace').classList.add('hidden');$('empty').classList.remove('hidden');notice(result.message);loadTree()}catch(error){notice(error.message)}};
 
 let tabContextKey='';
@@ -204,8 +206,12 @@ openColumnType=function(){originalOpenColumnType();const box=$('newIndexColumns'
 const manageColumnsButton=$('manageColumnsBtn');if(manageColumnsButton)manageColumnsButton.onclick=openColumnType;
 $('showCreateTableBtn').onclick=async()=>{try{const result=await api('/api/table-create?'+new URLSearchParams({schema:state.schema,table:state.table}));$('createTableSQLText').value=result.createSQL||'';$('createTableSQLDialog').showModal()}catch(error){notice(error.message)}};$('closeCreateTableSQL').onclick=()=>$('createTableSQLDialog').close();
 
-function renderSavedSQLChoices(){const select=$('savedSqlSelect');select.innerHTML=persistentConfig.savedQueries.map((item,index)=>`<option value="${index}">${esc(item.name)}${item.schema?` · ${esc(item.schema)}`:''}</option>`).join('');return select}
-$('saveSqlBtn').onclick=()=>{const sql=$('sqlEditor').value.trim();if(!sql){notice('请先输入要保存的 SQL');return}$('savedSqlName').value='';$('savedSqlSchema').innerHTML=state.databases.map(name=>`<option value="${esc(name)}">${esc(name)}</option>`).join('');$('savedSqlSchema').value=state.sqlSchema||'';$('saveSqlDialog').showModal()};$('cancelSaveSql').onclick=()=>$('saveSqlDialog').close();$('confirmSaveSql').onclick=async()=>{const name=$('savedSqlName').value.trim(),sql=$('sqlEditor').value.trim();if(!name||!sql){notice('请输入查询名称和 SQL');return}const item={name,schema:$('savedSqlSchema').value,sql};try{await updatePersistentConfig(config=>{const index=config.savedQueries.findIndex(query=>String(query.name).toLowerCase()===name.toLowerCase());if(index>=0)config.savedQueries[index]=item;else config.savedQueries.push(item)});$('saveSqlDialog').close();notice('SQL 查询已保存到 mysql-manage.json')}catch(error){notice(error.message)}};$('openSavedSqlBtn').onclick=()=>{renderSavedSQLChoices();if(!$('savedSqlSelect').options.length){notice('尚未保存 SQL 查询');return}$('savedSqlDialog').showModal()};$('cancelSavedSql').onclick=()=>$('savedSqlDialog').close();$('applySavedSql').onclick=()=>{const item=persistentConfig.savedQueries[Number($('savedSqlSelect').value)];if(!item)return;state.sqlSchema=item.schema||state.sqlSchema;$('sqlEditor').value=item.sql;state.sqlOffset=0;state.sqlLastResult=null;renderSqlSchemas();renderSQLResult(null);saveSQLTab();$('savedSqlDialog').close();notice(`已恢复查询：${item.name}`)};
+function queryConnectionName(item){return String(item.connectionName||'未命名连接').trim()||'未命名连接'}
+function queryConnectionDetail(item){const host=item.connectionHost||'',port=item.connectionPort||'3306',user=item.connectionUser||'';return host?`${user?`${user}@`:''}${host}:${port}`:'当前连接'}
+function queryConnectionKey(item){return `${queryConnectionName(item)}|${item.connectionHost||''}|${item.connectionPort||'3306'}|${item.connectionUser||''}`}
+function currentQueryConnection(){const host=$('dbHost').value.trim(),port=$('dbPort').value.trim()||'3306',user=$('dbUser').value.trim(),name=$('connectionName').value.trim();return {connectionName:name||`${user||'root'}@${host||'localhost'}:${port}`,connectionHost:host,connectionPort:port,connectionUser:user}}
+function renderSavedSQLChoices(){const select=$('savedSqlSelect'),groups=new Map();persistentConfig.savedQueries.forEach((item,index)=>{const key=queryConnectionKey(item);if(!groups.has(key))groups.set(key,{label:`${queryConnectionName(item)} · ${queryConnectionDetail(item)}`,items:[]});groups.get(key).items.push({item,index})});select.replaceChildren();groups.forEach(group=>{const optgroup=document.createElement('optgroup');optgroup.label=group.label;group.items.forEach(({item,index})=>optgroup.append(new Option(`${item.name}${item.schema?` · ${item.schema}`:''}`,String(index))));select.append(optgroup)});const updateDetail=()=>{const item=persistentConfig.savedQueries[Number(select.value)];$('savedSqlSelection').textContent=item?`连接：${queryConnectionName(item)}（${queryConnectionDetail(item)}） · 运行数据库：${item.schema||'未指定'}`:''};select.onchange=updateDetail;updateDetail();return select}
+$('saveSqlBtn').onclick=()=>{const sql=$('sqlEditor').value.trim();if(!sql){notice('请先输入要保存的 SQL');return}const connection=currentQueryConnection();$('savedSqlName').value='';$('savedSqlSchema').innerHTML=state.databases.map(name=>`<option value="${esc(name)}">${esc(name)}</option>`).join('');$('savedSqlSchema').value=state.sqlSchema||state.schema||'';$('savedSqlConnectionHint').textContent=`将随查询保存连接：${connection.connectionName}（${queryConnectionDetail(connection)}）`;$('saveSqlDialog').showModal()};$('cancelSaveSql').onclick=()=>$('saveSqlDialog').close();$('confirmSaveSql').onclick=async()=>{const name=$('savedSqlName').value.trim(),sql=$('sqlEditor').value.trim();if(!name||!sql){notice('请输入查询名称和 SQL');return}const item={name,schema:$('savedSqlSchema').value,sql,...currentQueryConnection()};try{await updatePersistentConfig(config=>{const index=config.savedQueries.findIndex(query=>queryConnectionKey(query)===queryConnectionKey(item)&&String(query.name).toLowerCase()===name.toLowerCase());if(index>=0)config.savedQueries[index]=item;else config.savedQueries.push(item)});$('saveSqlDialog').close();notice('SQL 查询已保存到 mysql-manage.json')}catch(error){showErrorDialog('保存 SQL 查询失败',error.message)}};$('openSavedSqlBtn').onclick=()=>{renderSavedSQLChoices();if(!$('savedSqlSelect').options.length){notice('尚未保存 SQL 查询');return}$('savedSqlDialog').showModal()};$('cancelSavedSql').onclick=()=>$('savedSqlDialog').close();$('applySavedSql').onclick=()=>{const item=persistentConfig.savedQueries[Number($('savedSqlSelect').value)];if(!item)return;const profile=persistentConfig.connections.find(connection=>(item.connectionName&&connection.name===item.connectionName)||(connection.host===(item.connectionHost||'')&&String(connection.port||'3306')===String(item.connectionPort||'3306')&&connection.user===(item.connectionUser||'')));const source=profile||item;$('connectionName').value=item.connectionName||source.name||'';$('dbHost').value=item.connectionHost||source.host||'';$('dbPort').value=item.connectionPort||source.port||'3306';$('dbUser').value=item.connectionUser||source.user||'';if(profile&&profile.password!==undefined)$('dbPassword').value=profile.password;state.sqlSchema=item.schema||state.sqlSchema;$('sqlEditor').value=item.sql||'';state.sqlOffset=0;state.sqlLastResult=null;renderSqlSchemas();renderSQLResult(null);saveSQLTab();$('savedSqlDialog').close();notice(`已恢复查询：${item.name}，连接资料和数据库已回填`)};
 refreshPersistentConfig().catch(error=>notice('读取 mysql-manage.json 失败：'+error.message));
 </script>
 
@@ -322,14 +328,14 @@ async function changeDesignerFieldType(name){
 
 
 <script>
-function showTransferProgress(title,message,percent){$('transferTitle').textContent=title;$('transferStatus').textContent=message;const progress=$('transferProgress');progress.max=100;progress.value=Math.max(0,Math.min(100,Number(percent)||0));$('transferOverlay').classList.remove('hidden')}
-function hideTransferProgress(){$('transferOverlay').classList.add('hidden')}
+function showTransferProgress(title,message,percent){document.body.classList.add('transfer-in-progress');$('transferTitle').textContent=title;$('transferStatus').textContent=message;const progress=$('transferProgress');progress.max=100;progress.value=Math.max(0,Math.min(100,Number(percent)||0));$('transferOverlay').classList.remove('hidden')}
+function hideTransferProgress(){document.body.classList.remove('transfer-in-progress');$('transferOverlay').classList.add('hidden')}
 function showErrorDialog(title,message){$('errorDialogTitle').textContent=title;$('errorDialogMessage').textContent=message||'未知错误';$('errorDialog').showModal()}
 $('closeErrorDialog').onclick=()=>$('errorDialog').close();
 function uploadSQLImport(form){return new Promise((resolve,reject)=>{const request=new XMLHttpRequest();request.open('POST','/api/import');request.responseType='json';request.upload.onprogress=event=>{if(event.lengthComputable){const percent=Math.round(event.loaded/event.total*100);showTransferProgress('正在上传 SQL 文件',`已上传 ${formatBytes(event.loaded)} / ${formatBytes(event.total)}（${percent}%）`,percent)}};request.upload.onload=()=>showTransferProgress('正在导入 SQL','文件已上传，正在执行 SQL…',100);request.onload=()=>{const payload=request.response||(()=>{try{return JSON.parse(request.responseText)}catch(error){return {}}})();if(request.status>=200&&request.status<300)resolve(payload);else reject(new Error(payload.error||payload.message||'导入失败'))};request.onerror=()=>reject(new Error('上传失败，请检查 EXE 服务是否仍在运行'));request.send(form)})}
-$('importForm').onsubmit=async event=>{event.preventDefault();const file=$('sqlFile').files[0],schema=$('importTargetSchema').value;if(!file||!schema){showErrorDialog('无法导入','请选择 SQL 文件和目标数据库');return}if(!confirm(`确定将 ${file.name} 导入到数据库 ${schema}？备份中的同名表可能被替换。`))return;const form=new FormData();form.append('schema',schema);form.append('file',file);if($('importCompatibilityMode').checked)form.append('compatibilityMode','1');showTransferProgress('正在上传 SQL 文件',`准备上传 ${file.name}…`,0);try{await uploadSQLImport(form);hideTransferProgress();$('importDialog').close();notice('导入完成');loadTree();loadRows()}catch(error){hideTransferProgress();showErrorDialog('导入失败',error.message)}};
+$('importForm').onsubmit=async event=>{event.preventDefault();const file=$('sqlFile').files[0],schema=$('importTargetSchema').value;if(!file||!schema){showErrorDialog('无法导入','请选择 SQL 文件和目标数据库');return}if(!confirm(`确定将 ${file.name} 导入到数据库 ${schema}？备份中的同名表可能被替换。`))return;const form=new FormData();form.append('schema',schema);form.append('file',file);form.append('compatibilityMode','1');$('importDialog').close();showTransferProgress('正在上传 SQL 文件',`准备上传 ${file.name}…`,0);await new Promise(requestAnimationFrame);try{await uploadSQLImport(form);hideTransferProgress();notice('导入完成');loadTree();loadRows()}catch(error){hideTransferProgress();showErrorDialog('导入失败',error.message)}};
 async function downloadBackupFile(job){showTransferProgress('正在下载数据库备份','正在准备下载…',0);const response=await fetch('/api/backup?'+new URLSearchParams({id:job.id,download:'1'}));if(!response.ok){const payload=await response.json().catch(()=>({}));throw new Error(payload.error||'备份文件下载失败')}const total=Number(response.headers.get('content-length'))||Number(job.bytes)||0;if(!response.body||!response.body.getReader){const blob=await response.blob();const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=(job.path||'backup.sql.gz').split(/[\\/]/).pop();document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);return}const reader=response.body.getReader(),chunks=[];let loaded=0;for(;;){const result=await reader.read();if(result.done)break;chunks.push(result.value);loaded+=result.value.length;const percent=total?Math.round(loaded/total*100):0;showTransferProgress('正在下载数据库备份',total?`已下载 ${formatBytes(loaded)} / ${formatBytes(total)}（${percent}%）`:`已下载 ${formatBytes(loaded)}`,percent)}const blob=new Blob(chunks,{type:'application/gzip'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=(job.path||'backup.sql.gz').split(/[\\/]/).pop();document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);showTransferProgress('正在下载数据库备份','下载完成',100)}
-async function startBackup(schemaOverride=''){const schema=schemaOverride||state.schema||state.sqlSchema;if(!schema){notice('请先选择一个数据库');return}if(!confirm(`确定备份数据库 ${schema}？`))return;try{const {id}=await api('/api/backup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema})});const overlay=$('backupOverlay'),progress=$('backupProgress'),status=$('backupStatus');overlay.classList.remove('hidden');progress.removeAttribute('value');const timer=setInterval(async()=>{try{const job=await api('/api/backup?id='+encodeURIComponent(id));const suffix=job.bytes?' · '+formatBytes(job.bytes):'';status.textContent=job.message+suffix;if(job.tableTotal>0){progress.max=job.tableTotal;progress.value=Math.min(job.tablesDone,job.tableTotal)}else progress.removeAttribute('value');if(job.finished){clearInterval(timer);overlay.classList.add('hidden');if(job.success){try{await downloadBackupFile(job);notice('数据库备份已下载')}catch(error){showErrorDialog('备份下载失败',error.message)}finally{hideTransferProgress()}}else showErrorDialog('数据库备份失败',job.message)}}catch(error){clearInterval(timer);overlay.classList.add('hidden');showErrorDialog('数据库备份失败',error.message)}} ,650)}catch(error){showErrorDialog('数据库备份失败',error.message)}}
+async function startBackup(schemaOverride=''){const schema=schemaOverride||state.schema||state.sqlSchema;if(!schema){notice('请先选择一个数据库');return}if(!confirm(`确定备份数据库 ${schema}？`))return;try{const {id}=await api('/api/backup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema})});const overlay=$('backupOverlay'),progress=$('backupProgress'),status=$('backupStatus');overlay.classList.remove('hidden');progress.removeAttribute('value');const timer=setInterval(async()=>{try{const job=await api('/api/backup?id='+encodeURIComponent(id));const suffix=job.bytes?' · '+formatBytes(job.bytes):'';status.textContent=job.message+suffix;if(job.tableTotal>0){progress.max=job.tableTotal;progress.value=Math.min(job.tablesDone,job.tableTotal)}else progress.removeAttribute('value');if(job.finished){clearInterval(timer);overlay.classList.add('hidden');if(job.success)showErrorDialog('备份完成',`文件已保存到 EXE 同目录：\n${job.path}`);else showErrorDialog('数据库备份失败',job.message)}}catch(error){clearInterval(timer);overlay.classList.add('hidden');showErrorDialog('数据库备份失败',error.message)}} ,650)}catch(error){showErrorDialog('数据库备份失败',error.message)}}
 function initSQLResizer(){const resizer=$('sqlResizer'),panel=$('sqlPanel');if(!resizer||!panel)return;const resize=event=>{const rect=panel.getBoundingClientRect();const minTop=150,minBottom=120;const top=Math.max(minTop,Math.min(rect.height-minBottom,event.clientY-rect.top));panel.style.gridTemplateRows=`${top}px 10px minmax(${minBottom}px,1fr)`};resizer.addEventListener('pointerdown',event=>{resizer.classList.add('dragging');resizer.setPointerCapture(event.pointerId);resize(event)});resizer.addEventListener('pointermove',event=>{if(resizer.hasPointerCapture(event.pointerId))resize(event)});const stop=event=>{resizer.classList.remove('dragging');if(resizer.hasPointerCapture(event.pointerId))resizer.releasePointerCapture(event.pointerId)};resizer.addEventListener('pointerup',stop);resizer.addEventListener('pointercancel',stop)}
 initSQLResizer();
 </script>
@@ -477,7 +483,7 @@ function showPermissionDialog(snapshot){
   const actions=document.querySelector('#connectionForm .modal-actions');
   if(actions&&!$('testConnectionBtn'))actions.insertAdjacentHTML('afterbegin','<button type="button" class="connection-test-button" id="testConnectionBtn">测试连接</button>');
   const originalApplyProfile=applySavedConnectionProfile;applySavedConnectionProfile=function(item){originalApplyProfile(item);if($('dbParams'))$('dbParams').value=item.params||''};
-  saveCurrentConnectionProfile=async function(){const suppliedName=$('connectionName').value.trim();if(!suppliedName&&!$('rememberConnection').checked)return;const name=suppliedName||`${$('dbUser').value.trim()}@${$('dbHost').value.trim()}:${$('dbPort').value.trim()}`;const profile={name,...connectionFormPayload()};try{await updatePersistentConfig(config=>{const index=config.connections.findIndex(item=>String(item.name).toLowerCase()===name.toLowerCase());if(index>=0)config.connections[index]=profile;else config.connections.push(profile)});$('connectionName').value=name;notice('连接信息已保存到 mysql-manage.json')}catch(error){notice('连接成功，但保存连接信息失败：'+error.message)}};
+  saveCurrentConnectionProfile=async function(){const suppliedName=$('connectionName').value.trim();if(!$('rememberConnection').checked)return;const name=suppliedName||`${$('dbUser').value.trim()}@${$('dbHost').value.trim()}:${$('dbPort').value.trim()}`;const profile={name,...connectionFormPayload()};try{await updatePersistentConfig(config=>{const index=config.connections.findIndex(item=>String(item.name).toLowerCase()===name.toLowerCase());if(index>=0)config.connections[index]=profile;else config.connections.push(profile)});$('connectionName').value=name;notice('连接信息已保存到 mysql-manage.json')}catch(error){notice('连接成功，但保存连接信息失败：'+error.message)}};
   $('testConnectionBtn').onclick=async()=>{const button=$('testConnectionBtn'),result=$('connectionTestResult');button.disabled=true;result.className='connection-test-result';result.textContent='正在测试连接…';try{const response=await api('/api/test-connection',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(connectionFormPayload())});$('dbParams').value=response.params||'';result.className='connection-test-result success';result.textContent='✓ '+response.message}catch(error){result.className='connection-test-result error';result.textContent='✕ '+error.message}finally{button.disabled=false}};
   $('connectionForm').onsubmit=async event=>{event.preventDefault();try{const response=await api('/api/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(connectionFormPayload())});$('dbParams').value=response.params||'';await saveCurrentConnectionProfile();state.connected=true;setConnectionButton(true);state.tabs=[];state.activeKey='';state.sqlTabs=[];state.activeSqlKey='';state.sqlLastResult=null;state.schema='';state.table='';state.columns=[];state.primaryKeys=[];state.filters=[];state.filterLogic='AND';$('connectionText').textContent=`${response.host}:${response.port} · ${response.user}`;$('connectDialog').close();$('workspace').classList.add('hidden');$('empty').classList.remove('hidden');notice(response.message);await loadTree();showPermissionDialog(response.permissions)}catch(error){showErrorDialog('连接失败',error.message)}};
 })();
@@ -535,7 +541,7 @@ $('createTableForm').onsubmit=async event=>{event.preventDefault();const virtual
 <script id="record-editor-and-sql-behavior">
 (function(){
   const baseRenderFilters=renderFilters;
-  renderFilters=function(){baseRenderFilters();const zone=document.querySelector('#tablePanel .navicat-filter-zone'),logic=zone&&zone.querySelector('.filter-logic'),add=$('navicatAddFilter');if(logic&&add)logic.append(add)};
+  renderFilters=function(){baseRenderFilters();document.querySelectorAll('#navicatAddFilter').forEach((button,index)=>{if(index>0)button.remove()})};
   function temporalInputType(column){const type=String(column.type||'').toUpperCase();if(type.startsWith('DATETIME')||type.startsWith('TIMESTAMP'))return 'datetime-local';if(type.startsWith('DATE'))return 'date';if(type.startsWith('TIME'))return 'time';return 'text'}
   function temporalEditorValue(value,inputType){const text=String(value??'').trim();if(!text)return '';if(inputType==='datetime-local')return text.replace(' ','T');return text}
   function temporalSavedValue(input){return input.type==='datetime-local'?input.value.replace('T',' '):input.value}
@@ -604,6 +610,7 @@ $('createTableForm').onsubmit=async event=>{event.preventDefault();const virtual
     if(type==='text')input.select();
     let settled=false;
     const cancel=()=>{if(settled)return;settled=true;restoreInlineCell(cell,original)};
+    input.addEventListener('blur',()=>window.setTimeout(()=>{if(!cell.contains(document.activeElement))cancel()},0));
     const commit=async()=>{
       if(settled)return;
       const value=inlineSavedValue(input);
@@ -695,4 +702,682 @@ $('createTableForm').onsubmit=async event=>{event.preventDefault();const virtual
 #tablePanel>.pager,.sql-result-pane>.pager{width:100%!important;margin:0!important;padding:8px 14px!important;border-top:0!important;background:#f4f6f8!important;color:var(--muted)!important;font-size:12px!important}
 .dark #tablePanel>.pager,.dark .sql-result-pane>.pager{background:#1d2939!important;border-color:#3b4a5c!important}
 </style>
+
+<style id="ui-polish-and-operation-errors-final">
+/* Final visual pass: controls share a soft rounded surface; data grids retain their established tabular treatment. */
+:root{--control-radius:10px;--button-radius:9px;--control-height:38px;--focus-ring:0 0 0 3px color-mix(in srgb,var(--blue) 18%,transparent);--button-shadow:0 1px 2px #10204018}
+button{min-height:var(--control-height);border-radius:var(--button-radius)!important;padding:8px 13px;box-shadow:var(--button-shadow);font-weight:650;letter-spacing:.01em;transition:transform .14s ease,filter .14s ease,box-shadow .14s ease}
+button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 12px #10204024}
+button:active:not(:disabled){transform:translateY(0);box-shadow:var(--button-shadow)}
+button:disabled{cursor:not-allowed;opacity:.58;box-shadow:none}
+button.secondary{border:1px solid var(--line);background:var(--control-bg)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:0;box-shadow:var(--focus-ring)!important;border-color:var(--blue)!important}
+input:not([type="checkbox"]):not([type="radio"]),select,textarea{border-radius:var(--control-radius)!important;min-height:var(--control-height);padding:8px 10px!important;line-height:1.35}
+input[type="file"]{padding:7px!important;cursor:pointer}
+input[type="checkbox"],input[type="radio"]{accent-color:var(--blue)}
+textarea.sql-editor{padding:12px!important;min-height:220px;border-radius:var(--control-radius)!important}
+.content{padding:24px 28px 30px}
+.toolbar{gap:10px;margin-bottom:18px}.toolbar h1{font-size:23px;letter-spacing:-.02em}
+#tableActions,.filter-actions,.modal-actions,.connection-actions,.sql-top,.actions,.pager{gap:9px}
+.card{border-radius:14px;padding:16px;box-shadow:0 5px 18px #1020400d}
+.filter-list{gap:10px}.filter-row{gap:10px}.filter-logic{margin-bottom:10px}.filter-note{margin-bottom:10px}
+.tab-bar{gap:7px;margin:-4px 0 16px;padding-bottom:4px}.tab{border-radius:var(--button-radius)!important;padding:8px 11px}
+.dialog,dialog{border:1px solid var(--line);border-radius:16px!important;padding:20px 22px;box-shadow:0 22px 65px #10204055}
+dialog::backdrop{backdrop-filter:blur(2px)}.modal-title{margin-bottom:12px}.hint{margin:5px 0 16px}.form-grid{gap:11px}.modal-actions{margin-top:20px}
+#connectDialog .form-grid,#columnTypeDialog .form-grid{row-gap:12px}
+.export-control,#tableActions .export-control{min-height:var(--control-height)!important;border-radius:var(--button-radius)!important;box-shadow:var(--button-shadow)}
+.export-control .export-mode,#tableActions .export-control .export-mode{min-height:36px!important;padding-top:7px!important;padding-bottom:7px!important}
+.export-control #exportBtn,#tableActions .export-control #exportBtn{min-height:36px!important;transform:none!important}
+.table-wrap{border-radius:0}.table-wrap table{border-spacing:0}.table-wrap th,.table-wrap td{padding:10px 12px}
+#tablePanel>.table-wrap,.sql-result .table-wrap{box-shadow:inset 0 1px 0 var(--line)}
+#tablePanel>.pager,.sql-result-pane>.pager{min-height:48px;align-items:center}
+.sql-result-toolbar{padding:2px 0 10px}.sql-result-toolbar button{min-height:34px;padding:6px 10px}
+.sql-suggestions{border-radius:var(--control-radius)!important;padding:4px}.sql-suggestion{min-height:34px;border-radius:7px!important;box-shadow:none}
+.sql-export-field,.existing-index,.index-columns label{border-radius:var(--button-radius)!important}
+.toast{border-radius:12px;padding:12px 16px;box-shadow:0 12px 32px #0005}
+#errorDialog{width:min(480px,calc(100vw - 32px));padding:22px 24px;border-top:4px solid var(--danger)!important}
+#errorDialog .modal-title{display:flex;align-items:center;gap:8px}#errorDialog .modal-title::before{content:'!';display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--danger);color:#fff;font-size:13px;font-weight:800}
+#errorDialogMessage{margin:0;color:var(--ink);line-height:1.6}#errorDialog .modal-actions{margin-top:22px}#errorDialog .modal-actions button{min-width:88px}
+@media(max-width:720px){.content{padding:16px}.toolbar{gap:8px}.toolbar h1{font-size:21px}.card{padding:13px}.filter input{min-width:min(100%,190px)}dialog{padding:18px 16px}.modal-actions{gap:8px}.modal-actions button{flex:1}.form-grid{gap:9px}}
+</style>
+<script id="operation-error-dialog-final">
+(function(){
+  const request = api;
+  let lastError = '';
+  function errorText(value){return value && value.message ? String(value.message) : String(value || '未知错误')}
+  function presentError(title, error){
+    const message = errorText(error);
+    const dialog = $('errorDialog');
+    if (!dialog) return;
+    lastError = message;
+    showErrorDialog(title || '操作失败', message);
+  }
+  api = async function(path, options={}){
+    try{return await request(path, options)}
+    catch(error){
+      if (!error.__shownToUser){
+        error.__shownToUser = true;
+        presentError('操作失败', error);
+      }
+      throw error;
+    }
+  };
+  window.addEventListener('unhandledrejection', event=>{
+    const error = event.reason instanceof Error ? event.reason : new Error(errorText(event.reason));
+    if (!error.__shownToUser){error.__shownToUser=true;presentError('操作失败', error)}
+    event.preventDefault();
+  });
+  window.addEventListener('error', event=>{
+    const error = event.error instanceof Error ? event.error : new Error(event.message || '页面发生未知错误');
+    if (!error.__shownToUser){error.__shownToUser=true;presentError('操作失败', error)}
+  });
+  $('closeErrorDialog').textContent='确认';
+})();
+</script>
+
+<style id="async-counts-and-import-polish-final">
+/* Import stays modal while parsing; the native file chooser now matches the application controls. */
+body.transfer-in-progress #app{pointer-events:none;user-select:none;filter:saturate(.88)}
+#transferOverlay{z-index:100!important;backdrop-filter:blur(3px)}
+#transferOverlay .backup-card{width:min(480px,calc(100vw - 32px));padding:26px;gap:14px;border-radius:16px}
+#importDialog{width:min(560px,calc(100vw - 32px))}
+#importDialog .form-grid{margin-bottom:14px}
+#importDialog #importTargetSchema{width:100%;height:var(--control-height);border-radius:var(--control-radius)!important}
+#importDialog input[type="file"]{display:block;width:100%;min-height:44px;margin:4px 0 12px;border:1px dashed color-mix(in srgb,var(--blue) 46%,var(--line));border-radius:var(--control-radius)!important;background:color-mix(in srgb,var(--control-bg) 82%,var(--blue) 5%)!important;padding:5px 7px!important;color:var(--ink)}
+#importDialog input[type="file"]::file-selector-button{height:32px;margin-right:10px;border:0;border-radius:8px;background:var(--blue);color:#fff;padding:0 12px;font:650 13px/1 system-ui,"Microsoft YaHei",sans-serif;cursor:pointer}
+#importDialog input[type="file"]::-webkit-file-upload-button{height:32px;margin-right:10px;border:0;border-radius:8px;background:var(--blue);color:#fff;padding:0 12px;font:650 13px/1 system-ui,"Microsoft YaHei",sans-serif;cursor:pointer}
+#importCompatibilityHint{margin:0 0 2px;padding:9px 11px;border:1px solid color-mix(in srgb,var(--blue) 26%,var(--line));border-radius:var(--button-radius);background:color-mix(in srgb,var(--blue) 7%,var(--control-bg));line-height:1.5}
+#importDialog .modal-actions{gap:12px;margin-top:22px}
+#importDialog .modal-actions button{min-width:102px}
+@media(max-width:720px){#importDialog .modal-actions{gap:10px}#importDialog .modal-actions button{min-width:0}}
+</style>
+<script id="async-counts-and-import-polish-final">
+(function(){
+  async function requestTableCount(schema, table){
+    const response=await fetch('/api/table-count?'+new URLSearchParams({schema,table}),{cache:'no-store'});
+    if(!response.ok)throw new Error('记录数读取失败');
+    return response.json();
+  }
+  async function loadTableCounts(schema, container, entries){
+    const pending=entries.filter(item=>item.type==='BASE TABLE').slice();
+    const workers=Array.from({length:Math.min(4,pending.length)},async()=>{
+      while(pending.length){
+        const item=pending.shift();
+        try{
+          const result=await requestTableCount(schema,item.name);
+          if(!container.isConnected)return;
+          const button=Array.from(container.querySelectorAll('.table')).find(element=>element.dataset.name===item.name);
+          const count=button&&button.querySelector('.navicat-table-count');
+          if(count)count.outerHTML=navicatRecordCount({...item,...result});
+        }catch(error){/* A count is supplementary; keep the table immediately usable. */}
+      }
+    });
+    await Promise.all(workers);
+  }
+  loadTree=async function(){
+    try{
+      let metadata=await api('/api/metadata');
+      if(state.connected&&!(metadata.databases||[]).length){metadata={...metadata,databases:(await api('/api/databases')).databases||[]}}
+      state.databases=metadata.databases||[];renderSqlSchemas();
+      if(metadata.permissions){accountPermissionSnapshot=metadata.permissions;applyPermissionVisibility()}
+      const cachedTables=metadata.tables||{};
+      const tree=$('tree');tree.innerHTML='';
+      for(const db of state.databases){
+        const box=document.createElement('div');box.className='db';
+        box.innerHTML=`<div class="db-title ${state.schema===db?'active':''}"><span class="db-caret">▸</span><span class="db-icon" aria-hidden="true">DB</span><span>${esc(db)}</span><span class="db-table-total"></span></div><div class="tables hidden"></div>`;
+        const title=box.querySelector('.db-title'),tables=box.querySelector('.tables'),caret=box.querySelector('.db-caret'),total=box.querySelector('.db-table-total');
+        const toggle=async()=>{
+          state.schema=db;state.sqlSchema=db;
+          const schemaSelect=$('sqlSchema');if(schemaSelect){schemaSelect.value=db;if(schemaSelect.value!==db)renderSqlSchemas()}
+          document.querySelectorAll('.db-title').forEach(element=>element.classList.toggle('active',element===title));
+          if(!tables.classList.contains('hidden')){tables.classList.add('hidden');caret.textContent='▸';return}
+          if(!tables.dataset.loaded){
+            tables.innerHTML='<span class="navicat-tree-empty">正在读取表…</span>';
+            try{
+              const entries=Array.isArray(cachedTables[db])?cachedTables[db]:(await api('/api/tables?'+new URLSearchParams({schema:db}))).tables||[];
+              total.textContent='表数量…';
+              tables.innerHTML=entries.map(item=>`<button class="table navicat-table" data-name="${esc(item.name)}" title="${esc(item.type==='BASE TABLE'?'单击打开数据表':'视图')}"><span class="navicat-table-icon ${item.type==='BASE TABLE'?'':'view-icon'}" aria-hidden="true">${item.type==='BASE TABLE'?'表':'视图'}</span><span class="navicat-table-name">${esc(item.name)}</span>${navicatRecordCount(item)}</button>`).join('')||'<span class="navicat-tree-empty">没有表</span>';
+              tables.querySelectorAll('.table').forEach(button=>button.onclick=()=>openTable(db,button.dataset.name));
+              tables.dataset.loaded='1';
+              requestAnimationFrame(()=>{if(tables.isConnected)total.textContent=`${entries.filter(item=>item.type==='BASE TABLE').length} 张表`});
+              void loadTableCounts(db,tables,entries);
+            }catch(error){tables.innerHTML=`<span class="navicat-tree-empty">读取失败：${esc(error.message)}</span>`;return}
+          }
+          tables.classList.remove('hidden');caret.textContent='▾';
+        };
+        title.onclick=toggle;tree.append(box);
+        if(Array.isArray(cachedTables[db])){
+          total.textContent=`${cachedTables[db].filter(item=>item.type==='BASE TABLE').length} 张表`;
+        }
+        if(state.schema===db||Array.isArray(cachedTables[db]))toggle();
+      }
+    }catch(error){showErrorDialog('读取数据库失败',error.message)}
+  };
+  const baseApplySavedSQL=$('applySavedSql').onclick;
+  $('applySavedSql').onclick=()=>{
+    const item=persistentConfig.savedQueries[Number($('savedSqlSelect').value)];
+    baseApplySavedSQL();
+    const tab=state.sqlTabs.find(entry=>entry.key===state.activeSqlKey);
+    if(item&&tab){tab.label=item.name;renderTabs();if(state.view==='sql')$('title').textContent=item.name}
+  };
+  const baseSaveSQL=$('confirmSaveSql').onclick;
+  $('confirmSaveSql').onclick=async()=>{
+    const name=$('savedSqlName').value.trim(),sql=$('sqlEditor').value.trim();
+    await baseSaveSQL();
+    const tab=state.sqlTabs.find(entry=>entry.key===state.activeSqlKey);
+    if(name&&sql&&tab){tab.label=name;renderTabs();if(state.view==='sql')$('title').textContent=name}
+  };
+})();
+</script>
+
+<style id="saved-query-and-import-picker-final">
+#importDialog .file-picker{display:flex;align-items:center;gap:12px;min-height:52px;margin:18px 0 16px;padding:8px 10px;border:1px dashed color-mix(in srgb,var(--blue) 46%,var(--line));border-radius:var(--control-radius);background:color-mix(in srgb,var(--control-bg) 82%,var(--blue) 5%)}
+#importDialog .file-picker input[type="file"]{position:absolute!important;width:1px!important;height:1px!important;margin:-1px!important;padding:0!important;border:0!important;clip:rect(0 0 0 0)!important;overflow:hidden!important;white-space:nowrap!important}
+#importDialog .file-picker-button{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-height:36px;padding:0 14px;border:1px solid var(--blue);border-radius:var(--button-radius);background:var(--blue);color:#fff;font:650 13px/1 system-ui,"Microsoft YaHei",sans-serif;cursor:pointer;transition:filter .16s ease,transform .16s ease}
+#importDialog .file-picker-button:hover{filter:brightness(1.05)}
+#importDialog .file-picker-button:active{transform:translateY(1px)}
+#importDialog .file-picker-name{min-width:0;overflow:hidden;color:var(--muted);text-overflow:ellipsis;white-space:nowrap}
+.saved-sql-selection{min-height:1.5em;margin:12px 0 0}
+#savedSqlConnectionHint{margin:0 0 14px}
+</style>
+
+
+<style id="permission-designer-layout-final">
+.sidebar .brand{display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;padding-left:8px!important;padding-right:8px!important}
+#columnTypeDialog .designer-shell{height:min(720px,82vh)!important;min-height:0!important}
+#columnTypeDialog .designer-body{height:0!important;min-height:0!important;overflow:auto!important}
+#columnTypeDialog .designer-tabs{flex:0 0 auto}
+#columnTypeDialog .designer-grid{min-width:780px}
+#columnTypeDialog .designer-grid td:last-child,#columnTypeDialog .designer-grid th:last-child{text-align:center!important;vertical-align:middle!important}
+#columnTypeDialog .designer-grid td:last-child button{margin-inline:auto!important}
+#columnTypeDialog .designer-sql{height:100%!important;min-height:0!important;box-sizing:border-box!important}
+#columnTypeDialog .designer-body{padding:0!important;position:relative!important;overflow:auto!important;overscroll-behavior:contain}
+#columnTypeDialog .designer-grid{border-collapse:separate!important;border-spacing:0!important}
+#columnTypeDialog .designer-grid thead th{position:sticky!important;top:0!important;z-index:5!important;background:var(--control-bg)!important;box-shadow:0 1px 0 var(--line)}
+#columnTypeDialog .designer-body>.designer-empty,#columnTypeDialog .designer-body>.designer-sql{margin:14px!important}
+#createTableSchema{width:auto!important;max-width:100%!important}
+.navicat-filter-zone .filter-logic #navicatAddFilter{display:none!important}
+</style>
+<script id="permission-designer-layout-final">
+(function(){
+  function fitCreateTableSchema(){
+    const select=$('createTableSchema');if(!select)return;
+    const longest=Math.max(0,...Array.from(select.options).map(option=>Array.from(option.textContent||'').length));
+    select.style.width=`${Math.min(520,Math.max(172,longest*15+58))}px`;
+  }
+  const baseOpenCreateTable=openCreateTable;
+  openCreateTable=function(){baseOpenCreateTable();fitCreateTableSchema()};
+  const baseRenderFilters=renderFilters;
+  renderFilters=function(){
+    baseRenderFilters();
+    const zone=document.querySelector('#tablePanel .filter');if(!zone)return;
+    zone.querySelectorAll('.filter-logic #navicatAddFilter').forEach(button=>button.remove());
+    const toolbar=$('navicatFilterToolbar');if(toolbar){toolbar.querySelectorAll('#navicatAddFilter').forEach((button,index)=>{if(index>0)button.remove()})}
+  };
+  renderDesignerFields=function(){
+    const body=$('designerBody'),columns=state.columns||[];
+    if(!designerSelectedField&&columns.length)designerSelectedField=columns[0].name;
+    body.innerHTML=`<table class="designer-grid"><thead><tr><th>字段名</th><th>类型</th><th>允许 NULL</th><th>主键</th><th>操作</th></tr></thead><tbody>${columns.map(column=>`<tr><td><label class="designer-field-label"><input type="radio" name="designerField" value="${esc(column.name)}" ${designerSelectedField===column.name?'checked':''}><input type="text" data-change-name="${esc(column.name)}" value="${esc(column.name)}" maxlength="64" aria-label="字段名称"></label></td><td><select data-change-type="${esc(column.name)}">${designerTypeOptions(column.type)}</select></td><td><span class="designer-check"><input type="checkbox" ${column.nullable?'checked':''} disabled></span></td><td><span class="designer-check"><input type="checkbox" ${column.primary?'checked':''} disabled></span></td><td><button type="button" class="secondary small" data-save-field="${esc(column.name)}">保存修改</button></td></tr>`).join('')}${designerAddingField?`<tr class="designer-add-row"><td><input type="text" id="designerNewFieldName" maxlength="64" placeholder="字段名"></td><td><select id="designerNewFieldType">${designerTypeOptions('VARCHAR(255)')}</select></td><td><span class="designer-check"><input id="designerNewFieldNullable" type="checkbox" checked></span></td><td>—</td><td><button type="button" id="designerConfirmAddField">新增</button></td></tr>`:''}</tbody></table>`||'<p class="designer-empty">未读取到字段。</p>';
+    body.querySelectorAll('input[name="designerField"]').forEach(input=>input.onchange=()=>designerSelectedField=input.value);
+    body.querySelectorAll('[data-save-field]').forEach(button=>button.onclick=()=>saveDesignerField(button.dataset.saveField));
+    if(designerAddingField)$('designerConfirmAddField').onclick=addDesignerField;
+  };
+  window.saveDesignerField=async function(name){
+    const body=$('designerBody'),type=body.querySelector(`[data-change-type="${CSS.escape(name)}"]`)?.value,newName=body.querySelector(`[data-change-name="${CSS.escape(name)}"]`)?.value.trim();
+    if(!type||!newName){notice('请输入字段名称并选择字段类型');return}
+    const save=force=>api('/api/column-type',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema:state.schema,table:state.table,column:name,newName,type,force})});
+    try{const result=await save(false);notice(result.message);designerSelectedField=result.name||newName;await loadRows();renderDesignerShell();renderDesignerTab()}
+    catch(error){if(error.payload&&error.payload.warning&&confirm(error.message+'\n\n是否继续保存？')){try{const result=await save(true);notice(result.message);designerSelectedField=result.name||newName;await loadRows();renderDesignerShell();renderDesignerTab()}catch(finalError){showErrorDialog('保存字段失败',finalError.message)}}else showErrorDialog('保存字段失败',error.message)}
+  };
+})();
+</script>
+
+<style id="data-layout-recovery-final">
+/* Restore the compact, edge-to-edge grid layout after global UI overrides. */
+.content{padding:0!important}
+#tablePanel,#sqlPanel{border:0!important;border-radius:0!important;box-shadow:none!important}
+#workspace>.toolbar{margin:0!important}
+#workspace>.tab-bar{margin:0!important;padding:4px 14px!important;min-height:40px!important;align-items:center!important}
+#workspace>.tab-bar .tab{margin-top:0!important}
+#tablePanel{padding:0!important}
+#tablePanel>.filter{margin:0!important;padding:4px 0!important}
+#tablePanel .navicat-filter-toolbar{min-height:36px!important;padding:3px 14px!important;gap:5px!important}
+#tablePanel .filter-actions{margin:0!important;padding:3px 14px!important}
+#tablePanel .navicat-filter-toolbar button,#tablePanel .filter-actions button{min-height:30px!important;padding:4px 8px!important;font-size:12px!important}
+#tablePanel .navicat-filter-toolbar strong{font-size:12px!important}
+#tablePanel .navicat-filter-zone .filter-logic{margin:0!important;padding:2px 14px!important}
+#tablePanel .navicat-filter-zone .filter-list{gap:4px!important}
+#tablePanel .navicat-filter-zone .filter-row{padding:2px 14px!important}
+#tablePanel .navicat-filter-zone .filter-row select,#tablePanel .navicat-filter-zone .filter-row input{height:28px!important;min-height:28px!important;padding:3px 6px!important}
+#tablePanel .navicat-filter-zone #filterLogic{height:28px!important;min-height:28px!important;min-width:168px!important;padding:3px 34px 3px 6px!important;border-radius:3px!important}
+#tablePanel .navicat-filter-zone .navicat-filter-enabled{width:14px!important;min-width:14px!important;margin-left:0!important}
+#tablePanel .navicat-filter-zone .navicat-filter-enabled input{width:13px!important;height:13px!important;margin:0!important}
+#tablePanel .navicat-filter-zone .filter-row .small{height:28px!important;min-height:28px!important;padding:3px 8px!important}
+#tablePanel>.table-wrap{width:100%!important;margin:0!important;min-height:0!important;flex:1 1 auto!important;overflow:auto!important;scrollbar-gutter:auto!important;border-top:1px solid var(--line)!important;border-bottom:1px solid var(--line)!important;border-radius:0!important;box-shadow:none!important}
+#sqlPanel{grid-template-rows:minmax(150px,1fr) 10px minmax(180px,1fr)!important;padding:10px 0 0!important}
+#sqlPanel>.sql-input-pane{margin:0 14px!important;padding:0 0 4px!important}
+#sqlPanel>.sql-resizer{width:100%!important;height:10px!important;margin:0!important;border-radius:0!important;background:var(--line)!important;cursor:row-resize!important;touch-action:none!important;user-select:none!important}
+#sqlPanel>.sql-resizer::after{left:0!important;right:0!important;top:4px!important;height:2px!important}
+#sqlPanel>.sql-result-pane{padding:4px 0 0!important;overflow:hidden!important}
+#sqlPanel .sql-result{margin-top:0!important;min-height:0!important;overflow:hidden!important}
+#sqlPanel .sql-result-toolbar{margin:0 14px!important;padding:0 0 8px!important}
+#sqlPanel .sql-result .table-wrap{width:100%!important;margin:0!important;min-height:0!important;flex:1 1 auto!important;overflow:auto!important;scrollbar-gutter:auto!important;border-top:1px solid var(--line)!important;border-bottom:1px solid var(--line)!important;border-radius:0!important;box-shadow:none!important}
+#tablePanel>.table-wrap table,#sqlPanel .sql-result .table-wrap table{width:100%!important;margin:0!important;border-spacing:0!important}
+#tablePanel>.table-wrap th,#tablePanel>.table-wrap td,#sqlPanel .sql-result .table-wrap th,#sqlPanel .sql-result .table-wrap td{padding:6px 9px!important}
+#tablePanel>.pager,#sqlPanel .sql-result-pane>.pager{width:100%!important;min-height:38px!important;flex:0 0 38px!important;margin:0!important;padding:4px 14px!important;gap:10px!important;align-items:center!important;overflow:visible!important;border-top:0!important;background:#f4f6f8!important;color:var(--muted)!important;font-size:12px!important}
+#tablePanel>.pager .small,#sqlPanel .sql-result-pane>.pager .small{min-height:30px!important;padding:3px 8px!important;border-radius:3px!important;font-size:12px!important;transform:none!important;box-shadow:none!important}
+#sqlPager{width:100%!important;min-height:38px!important;flex:0 0 38px!important;margin:0!important;padding:4px 14px!important;gap:10px!important;align-items:center!important;overflow:visible!important;border-top:0!important;background:#f4f6f8!important;color:var(--muted)!important;font-size:12px!important}
+#sqlPager .small{min-height:30px!important;padding:3px 8px!important;border-radius:3px!important;font-size:12px!important;transform:none!important;box-shadow:none!important}
+.dark #tablePanel>.pager,.dark #sqlPanel .sql-result-pane>.pager{background:#1d2939!important;border-color:#3b4a5c!important}
+</style>
+<script id="sql-resizer-recovery-final">
+(function(){
+  const panel=$('sqlPanel'),existing=$('sqlResizer');
+  if(!panel||!existing)return;
+  const resizer=existing.cloneNode(true);existing.replaceWith(resizer);
+  let activePointer=null;
+  const resize=event=>{
+    const rect=panel.getBoundingClientRect(),minTop=150,minBottom=180;
+    const top=Math.max(minTop,Math.min(rect.height-minBottom,event.clientY-rect.top));
+    panel.style.setProperty('grid-template-rows',`${top}px 10px minmax(${minBottom}px,1fr)`,'important');
+  };
+  const stop=event=>{
+    if(activePointer!==event.pointerId)return;
+    activePointer=null;resizer.classList.remove('dragging');
+    if(resizer.hasPointerCapture(event.pointerId))resizer.releasePointerCapture(event.pointerId);
+  };
+  resizer.addEventListener('pointerdown',event=>{event.preventDefault();activePointer=event.pointerId;resizer.classList.add('dragging');resizer.setPointerCapture(event.pointerId);resize(event)});
+  resizer.addEventListener('pointermove',event=>{if(activePointer===event.pointerId)resize(event)});
+  resizer.addEventListener('pointerup',stop);resizer.addEventListener('pointercancel',stop);
+})();
+</script>
+<style id="navicat-table-operation-bar-final">
+/* Navicat-like table command bar: the command row owns actions, while the
+   filter and sort builders remain compact, expandable work areas beneath it. */
+#navicatTableToolbar{display:flex;align-items:center;gap:3px;min-height:46px;padding:5px 14px;border-bottom:1px solid var(--line);background:linear-gradient(#fff,#f2f5f8);overflow-x:auto}
+#navicatTableToolbar .navicat-table-command{display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;min-height:32px;padding:5px 9px!important;border:1px solid transparent!important;border-radius:4px!important;background:transparent!important;color:#294963!important;box-shadow:none!important;font-size:12px;font-weight:600}
+#navicatTableToolbar .navicat-table-command:hover:not(:disabled){transform:none!important;background:#e6f2fc!important;border-color:#a9cce8!important;box-shadow:none!important}
+#navicatTableToolbar .navicat-table-command.primary{background:linear-gradient(#f8fdff,#dbeefa)!important;border-color:#91bfe3!important;color:#135f9f!important}
+#navicatTableToolbar .navicat-table-command.danger{color:#b33945!important}
+#navicatTableToolbar .navicat-command-separator{width:1px;height:24px;flex:0 0 1px;margin:0 4px;background:#d4dbe2}
+#navicatTableToolbar .navicat-transaction-status{display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;margin-left:5px;color:#9d5f0e;font-size:12px;font-weight:650;white-space:nowrap}
+#navicatTableToolbar .navicat-transaction-status::before{content:"";width:7px;height:7px;border-radius:50%;background:#e6a536;box-shadow:0 0 0 3px #f7e8c9}
+#navicatTableToolbar .navicat-table-spacer{flex:1 0 8px}
+#tablePanel>.filter{border-bottom:1px solid var(--line)!important}
+#tablePanel .navicat-filter-toolbar{background:#fafbfd}
+#navicatSortPanel{display:flex;align-items:center;gap:7px;padding:5px 14px 7px;border-top:1px solid #e1e6ec;background:#fafbfd}
+#navicatSortPanel strong{font-size:12px;color:#47627c;white-space:nowrap}
+#navicatSortPanel select{width:auto;min-width:118px;height:28px!important;min-height:28px!important;padding:3px 28px 3px 7px!important;border-radius:3px!important;font-size:12px}
+#navicatSortPanel button{min-height:28px!important;padding:3px 8px!important;border-radius:3px!important;font-size:12px}
+#tablePanel.navicat-text-mode td{white-space:pre-wrap!important;word-break:break-word}
+#tablePanel>.pager .filter-query-preview{display:block;min-width:0;max-width:min(62vw,760px);margin-left:12px;overflow:hidden;color:#49627a;font:11px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:nowrap;text-overflow:ellipsis}
+#tablePanel>.pager .filter-query-preview::before{content:"SQL  ";color:#1976c9;font-family:system-ui,"Microsoft YaHei",sans-serif;font-weight:700}
+.dark #tablePanel>.pager .filter-query-preview{color:#b8cee1}.dark #tablePanel>.pager .filter-query-preview::before{color:#6bb9f6}
+/* The former header export controls remain in the document for their existing
+   handlers, but are no longer exposed in the upper-right command area. */
+#workspace>.toolbar .export-control,#workspace>.toolbar #showCreateTableBtn{display:none!important}
+#navicatTableToolbar .navicat-table-command.export-command{background:var(--blue)!important;border-color:var(--blue)!important;color:#fff!important}
+#navicatTableToolbar .navicat-table-command.export-command:hover:not(:disabled){background:color-mix(in srgb,var(--blue) 88%,#000)!important;border-color:color-mix(in srgb,var(--blue) 88%,#000)!important}
+#navicatTableToolbar .navicat-table-command.active-toggle{background:#dbeefa!important;border-color:#76adda!important;color:#135f9f!important;box-shadow:inset 0 1px 0 #fff!important}
+.dark #navicatTableToolbar .navicat-table-command.active-toggle{background:#285275!important;border-color:#4d8fbd!important;color:#dcf2ff!important}
+#tableInfoDialog{width:min(840px,94vw);max-height:88vh;padding:0;overflow:hidden}
+#tableInfoDialog #tableInfoContent{max-height:calc(88vh - 72px);overflow:auto}
+#tableInfoDialog .table-info-header{display:flex;align-items:center;gap:14px;padding:18px 22px 15px;border-bottom:1px solid var(--line)}
+#tableInfoDialog .table-info-icon{display:grid;place-items:center;width:54px;height:54px;border:3px solid #2e8bdb;border-radius:5px;color:#2e8bdb;font-size:27px;line-height:1}
+#tableInfoDialog .table-info-title{min-width:0}.table-info-title h2{margin:0;color:var(--ink);font-size:19px}.table-info-title p{margin:3px 0 0;color:var(--muted)}
+#tableInfoDialog .table-info-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;padding:8px 22px 16px}
+#tableInfoDialog .table-info-item{box-sizing:border-box;min-width:0;padding:11px 12px 10px 0}#tableInfoDialog .table-info-item:nth-child(odd){border-right:1px solid var(--line);padding-right:24px}#tableInfoDialog .table-info-item:nth-child(even){padding-left:28px!important}.table-info-item dt{color:var(--muted);font-size:13px}.table-info-item dd{margin:2px 0 0;color:var(--ink);font-size:15px;word-break:break-word}.dark #tableInfoDialog .table-info-icon{border-color:#66b7f5;color:#66b7f5}
+#tableInfoDialog .table-info-sql{margin:0 22px 20px;padding:14px 16px;border:1px solid var(--line);border-radius:8px;background:var(--control-bg)}#tableInfoDialog .table-info-sql h3{margin:0 0 9px;font-size:14px;color:var(--muted)}#tableInfoDialog .table-info-sql pre{max-height:30vh;margin:0;overflow:auto;color:var(--ink);font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
+@media(max-width:560px){#tableInfoDialog .table-info-grid{grid-template-columns:1fr}#tableInfoDialog .table-info-item:nth-child(odd){border-right:0;padding-right:0}#tableInfoDialog .table-info-item:nth-child(even){padding-left:0}}
+.dark #navicatTableToolbar{background:linear-gradient(#243244,#1c2939);border-color:#3b4a5c}.dark #navicatTableToolbar .navicat-table-command{color:#d2e1f0!important}.dark #navicatTableToolbar .navicat-table-command:hover:not(:disabled){background:#2b4359!important;border-color:#4b6f8d!important}.dark #navicatTableToolbar .navicat-table-command.primary{background:linear-gradient(#285275,#1d405e)!important;border-color:#4d8fbd!important}.dark #navicatTableToolbar .navicat-command-separator{background:#42566d}.dark #navicatSortPanel{background:#1d2939;border-color:#3b4a5c}.dark #navicatSortPanel strong{color:#b9cde0}
+</style>
+<script id="navicat-table-operation-bar-final">
+(function(){
+  let transactionActive=false,sortVisible=false,textMode=false;
+  const command=(id,label,extra='')=>`<button type="button" id="${id}" class="navicat-table-command ${extra}">${label}</button>`;
+  function toolbar(){
+    const panel=$('tablePanel');if(!panel)return null;
+	const batchDelete=$('batchDeleteBtn');
+    let bar=$('navicatTableToolbar');
+    if(!bar){bar=document.createElement('div');bar.id='navicatTableToolbar';const filter=panel.querySelector('.filter');panel.insertBefore(bar,filter||panel.firstChild)}
+    bar.innerHTML=transactionActive
+      ? command('navicatCommitTransaction','提交','primary')+command('navicatRollbackTransaction','回滚','danger')+'<span class="navicat-transaction-status">事务进行中</span><span class="navicat-command-separator"></span>'
+      : command('navicatStartTransaction','开始事务','primary')+'<span class="navicat-command-separator"></span>';
+    bar.innerHTML+=command('navicatTextMode',textMode?'文本：换行':'文本：自动')+command('navicatOpenFilters','筛选',navicatFilterVisible?'active-toggle':'')+command('navicatOpenSort','排序',sortVisible?'active-toggle':'')+'<span class="navicat-command-separator"></span>'+command('navicatImportTable','导入')+command('navicatExportTable','导出','export-command')+'<span class="navicat-command-separator"></span><span id="navicatBatchDeleteSlot"></span><span class="navicat-command-separator"></span>'+command('navicatTableInfo','ⓘ 表信息')+command('navicatToolbarAdd','＋ 新记录')+command('navicatToolbarRefresh','↻ 刷新')+'<span class="navicat-table-spacer"></span>';
+	if(batchDelete){batchDelete.className='navicat-table-command export-command';batchDelete.title='删除已选择的记录';$('navicatBatchDeleteSlot').append(batchDelete);updateBatchDeleteButton()}
+    const start=$('navicatStartTransaction');if(start)start.onclick=()=>runTransaction('start');
+    const commit=$('navicatCommitTransaction');if(commit)commit.onclick=()=>runTransaction('commit');
+    const rollback=$('navicatRollbackTransaction');if(rollback)rollback.onclick=()=>runTransaction('rollback');
+    $('navicatTextMode').onclick=()=>{textMode=!textMode;panel.classList.toggle('navicat-text-mode',textMode);toolbar()};
+    $('navicatOpenFilters').onclick=()=>{navicatFilterVisible=!navicatFilterVisible;renderFilters();if(navicatFilterVisible)document.querySelector('#tablePanel .filter')?.scrollIntoView({block:'nearest'})};
+    $('navicatOpenSort').onclick=()=>{sortVisible=!sortVisible;toolbar();renderSortPanel()};
+    $('navicatImportTable').onclick=()=>$('importBtn')?.click();$('navicatExportTable').onclick=()=>$('exportBtn')?.click();$('navicatTableInfo').onclick=openTableInfo;
+    $('navicatToolbarAdd').onclick=()=>navicatInsertRow();$('navicatToolbarRefresh').onclick=async()=>{await loadRows();if(!transactionActive)await loadTree();notice('当前表已刷新')};
+    if(typeof applyPermissionVisibility==='function')applyPermissionVisibility();
+    if(typeof canUsePrivilege==='function'){
+      const schema=state.schema,canRead=canUsePrivilege('SELECT',schema),canInsert=canUsePrivilege('INSERT',schema),canCreate=canUsePrivilege('CREATE',schema);
+      [['navicatStartTransaction',!canRead],['navicatOpenFilters',!canRead],['navicatOpenSort',!canRead],['navicatExportTable',!canRead],['navicatTableInfo',!canRead],['navicatToolbarRefresh',!canRead],['navicatToolbarAdd',!canInsert],['navicatImportTable',!(canInsert||canCreate)]].forEach(([id,disabled])=>{const button=$(id);if(button)button.disabled=disabled});
+    }
+    return bar;
+  }
+  function renderSortPanel(){
+    const filter=document.querySelector('#tablePanel .filter');if(!filter)return;
+    filter.querySelector('#navicatSortPanel')?.remove();
+    if(!sortVisible)return;
+    const columns=state.columns||[];
+    const options='<option value="">请选择字段</option>'+columns.map(column=>`<option value="${esc(column.name)}" ${state.sortColumn===column.name?'selected':''}>${esc(column.name)}</option>`).join('');
+    const panel=document.createElement('div');panel.id='navicatSortPanel';
+    panel.innerHTML=`<strong>排序规则</strong><select id="navicatSortColumn">${options}</select><select id="navicatSortDirection"><option value="asc" ${state.sortDirection!=='desc'?'selected':''}>升序 (ASC)</option><option value="desc" ${state.sortDirection==='desc'?'selected':''}>降序 (DESC)</option></select><button type="button" id="navicatApplySort">应用</button><button type="button" class="secondary" id="navicatClearSort">清除</button>`;
+    const anchor=$('navicatFilterToolbar');if(anchor)anchor.after(panel);else filter.prepend(panel);
+    $('navicatApplySort').onclick=async()=>{state.sortColumn=$('navicatSortColumn').value;state.sortDirection=$('navicatSortDirection').value;resetPaging();await loadRows();notice(state.sortColumn?'排序已应用':'已恢复默认排序')};
+    $('navicatClearSort').onclick=async()=>{state.sortColumn='';state.sortDirection='asc';resetPaging();await loadRows();renderSortPanel();notice('排序已清除')};
+  }
+  async function runTransaction(action){
+    const labels={start:'开始事务',commit:'提交事务',rollback:'回滚事务'};
+    try{
+      const result=await api('/api/transaction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});
+      transactionActive=!!result.active;toolbar();await loadRows();if(!transactionActive)await loadTree();notice(result.message||labels[action]+'完成');
+    }catch(error){notice(error.message)}
+  }
+  function ensureTableInfoDialog(){
+    let dialog=$('tableInfoDialog');if(dialog)return dialog;
+    dialog=document.createElement('dialog');dialog.id='tableInfoDialog';
+    dialog.innerHTML='<div id="tableInfoContent"></div><div class="modal-actions" style="padding:0 22px 18px;margin:0"><button type="button" class="secondary" id="copyTableInfoSQL">复制建表 SQL</button><button type="button" class="secondary" id="closeTableInfo">关闭</button></div>';
+    document.body.append(dialog);$('closeTableInfo').onclick=()=>dialog.close();$('copyTableInfoSQL').onclick=copyTableInfoSQL;return dialog;
+  }
+  async function copyTableInfoSQL(){
+    try{const result=await api('/api/table-create?'+new URLSearchParams({schema:state.schema,table:state.table})),sql=result.createSQL||'';if(!sql){notice('没有可复制的建表语句');return}
+      if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(sql);else{const helper=document.createElement('textarea');helper.value=sql;helper.style.position='fixed';helper.style.opacity='0';document.body.append(helper);helper.select();if(!document.execCommand('copy'))throw new Error('浏览器拒绝访问剪贴板');helper.remove()}notice('建表 SQL 已复制到剪贴板')
+    }catch(error){showErrorDialog('复制建表 SQL 失败',error.message)}
+  }
+  function tableInfoBytes(value){
+    const bytes=Math.max(0,Number(value)||0),raw=bytes.toLocaleString('en-US');
+    if(!bytes)return '0 bytes (0)';if(bytes<1024)return `${raw} bytes (${raw})`;
+    const units=['KB','MB','GB','TB'];let amount=bytes/1024,index=0;while(amount>=1024&&index<units.length-1){amount/=1024;index++}
+    return `${amount.toFixed(2)} ${units[index]} (${raw})`;
+  }
+  async function openTableInfo(){
+    if(!state.schema||!state.table){notice('请先打开一张数据表');return}
+    try{
+      const query=new URLSearchParams({schema:state.schema,table:state.table}),[info,create]=await Promise.all([api('/api/table-info?'+query),api('/api/table-create?'+query)]),createSQL=create.createSQL||'';
+      const items=[['行',Number(info.rows||0).toLocaleString('en-US')],['引擎',info.engine||'--'],['自动递增',info.autoIncrement?Number(info.autoIncrement).toLocaleString('en-US'):'--'],['行格式',info.rowFormat||'--'],['修改日期',info.updateTime||'--'],['创建日期',info.createTime||'--'],['检查时间',info.checkTime||'--'],['索引长度',tableInfoBytes(info.indexLength)],['数据长度',tableInfoBytes(info.dataLength)],['最大数据长度',tableInfoBytes(info.maxDataLength)],['数据可用空间',tableInfoBytes(info.dataFree)],['排序规则',info.collation||'--'],['创建选项',info.createOptions||'--'],['注释',info.comment||'--']];
+      const dialog=ensureTableInfoDialog(),content=$('tableInfoContent');content.innerHTML=`<header class="table-info-header"><span class="table-info-icon" aria-hidden="true">▦</span><div class="table-info-title"><h2>${esc(info.table)}</h2><p>表 · ${esc(info.schema)}</p></div></header><dl class="table-info-grid">${items.map(([label,value])=>`<div class="table-info-item"><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl><section class="table-info-sql"><h3>建表 SQL</h3><pre>${esc(createSQL)}</pre></section>`;
+      dialog.showModal();
+    }catch(error){notice(error.message)}
+  }
+  async function refreshTransactionState(){
+    try{const result=await api('/api/transaction');transactionActive=!!result.active}catch(error){transactionActive=false}
+    toolbar();renderSortPanel();
+  }
+  const previousDecorate=navicatDecorateGrid;
+  navicatDecorateGrid=function(){
+    previousDecorate();document.querySelector('#navicatGridTools')?.remove();toolbar();renderSortPanel();
+  };
+  const previousRenderFilters=renderFilters;
+  renderFilters=function(){previousRenderFilters();toolbar();renderSortPanel()};
+  function renderFilterQueryPreview(result){
+    const pager=document.querySelector('#tablePanel>.pager');if(!pager)return;
+    let preview=$('filterQueryPreview');
+    if(!preview){preview=document.createElement('code');preview.id='filterQueryPreview';preview.className='filter-query-preview';pager.append(preview)}
+    const sql=String((result&&result.queryPreview)||'');preview.textContent=sql;preview.title=sql;preview.classList.toggle('hidden',!sql);
+  }
+  const tableRenderWithToolbar=renderTable;
+  renderTable=function(result,save=true){tableRenderWithToolbar(result,save);renderFilterQueryPreview(result)};
+  const previousOpenTable=openTable;
+  openTable=async function(){const result=await previousOpenTable.apply(this,arguments);await refreshTransactionState();return result};
+  refreshTransactionState();
+})();
+</script>
+<style id="saved-query-export-and-dark-mode-final">
+body.dark #workspace>.toolbar{background:linear-gradient(#243244,#1c2939)!important;border-color:#3b4a5c!important}
+body.dark #workspace>.toolbar h1{color:#dcecff!important}body.dark #workspace>.toolbar button{background:linear-gradient(#304258,#243448)!important;border-color:#4b6178!important;color:#d2e1f0!important}
+body.dark #workspace>.toolbar button:hover:not(:disabled){background:#38506a!important;border-color:#6390b6!important}
+body.dark #tablePanel .navicat-filter-toolbar{background:#1d2939!important;border-color:#3b4a5c!important}body.dark #tablePanel .navicat-filter-toolbar strong{color:#c9dced!important}
+body.dark #tablePanel .navicat-filter-toolbar button{background:linear-gradient(#304258,#243448)!important;border-color:#4b6178!important;color:#d2e1f0!important}
+/* Keep the filter builder visually continuous: the grid header provides the
+   first data boundary, so these intermediate horizontal separators are noise. */
+#tablePanel .navicat-filter-toolbar{border-bottom:0!important}
+#tablePanel>.filter,#tablePanel>.table-wrap{border-top:0!important;border-bottom:0!important}
+#tablePanel .navicat-filter-zone .filter-actions{border-top:0!important}
+#navicatTableToolbar #batchDeleteBtn{background:var(--danger)!important;border-color:var(--danger)!important;color:#fff!important}
+#navicatTableToolbar #batchDeleteBtn:hover:not(:disabled){background:color-mix(in srgb,var(--danger) 88%,#000)!important;border-color:color-mix(in srgb,var(--danger) 88%,#000)!important}
+</style>
+<script id="saved-query-export-and-dark-mode-final">
+(function(){
+  function savedConnectionKey(item){
+    const host=String(item.connectionHost||'').trim().toLowerCase(),port=String(item.connectionPort||'3306').trim(),user=String(item.connectionUser||'').trim().toLowerCase();
+    return host||user?`${host}|${port}|${user}`:`name:${String(item.connectionName||'').trim().toLowerCase()}`;
+  }
+  queryConnectionKey=savedConnectionKey;
+  renderSavedSQLChoices=function(){
+    const select=$('savedSqlSelect'),connection=currentQueryConnection(),connectionKey=savedConnectionKey(connection),groups=new Map();
+    persistentConfig.savedQueries.forEach((item,index)=>{
+      if(savedConnectionKey(item)!==connectionKey)return;
+      const schema=String(item.schema||'未指定数据库').trim()||'未指定数据库';
+      if(!groups.has(schema))groups.set(schema,[]);groups.get(schema).push({item,index});
+    });
+    select.replaceChildren();groups.forEach((items,schema)=>{const group=document.createElement('optgroup');group.label=`${queryConnectionName(connection)} · ${queryConnectionDetail(connection)} — ${schema}`;items.forEach(({item,index})=>group.append(new Option(item.name,String(index))));select.append(group)});
+    const updateDetail=()=>{const item=persistentConfig.savedQueries[Number(select.value)];$('savedSqlSelection').textContent=item?`连接：${queryConnectionName(connection)}（${queryConnectionDetail(connection)}） · 数据库：${item.schema||'未指定'}`:''};
+    select.onchange=updateDetail;updateDetail();return select;
+  };
+  $('applySavedSql').onclick=()=>{
+    const item=persistentConfig.savedQueries[Number($('savedSqlSelect').value)],connection=currentQueryConnection();if(!item)return;
+    if(savedConnectionKey(item)!==savedConnectionKey(connection)){showErrorDialog('连接不匹配','该保存查询不属于当前 MySQL 连接，不能在当前连接中执行。');return}
+    state.sqlSchema=item.schema||state.sqlSchema;$('sqlEditor').value=item.sql||'';state.sqlOffset=0;state.sqlLastResult=null;renderSqlSchemas();renderSQLResult(null);saveSQLTab();const tab=state.sqlTabs.find(entry=>entry.key===state.activeSqlKey);if(tab){tab.label=item.name;renderTabs();if(state.view==='sql')$('title').textContent=item.name}$('savedSqlDialog').close();notice(`已恢复查询：${item.name}`);
+  };
+})();
+</script>
+<style id="record-context-menu-final">
+#recordContextMenu{position:fixed;z-index:10050;min-width:154px;padding:5px;border:1px solid #b8c5d1;border-radius:5px;background:#fff;box-shadow:0 8px 22px rgba(22,39,58,.2)}
+#recordContextMenu.hidden{display:none!important}
+#recordContextMenu button{display:block;width:100%;padding:7px 10px;border:0;border-radius:3px;background:transparent;color:#24384b;text-align:left;font:13px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;cursor:pointer}
+#recordContextMenu button:hover{background:#e8f1f9;color:#174f7e}
+body.dark #recordContextMenu{border-color:#52667a;background:#263548;box-shadow:0 8px 22px rgba(0,0,0,.38)}
+body.dark #recordContextMenu button{color:#dbe8f4}
+body.dark #recordContextMenu button:hover{background:#3b526b;color:#fff}
+</style>
+<script id="record-context-menu-final">
+(function(){
+  const createTableSave=$('createTableDialog')?.querySelector('.designer-save');
+  const createTableCancel=$('cancelCreateTable');
+  if(createTableSave&&createTableCancel)createTableCancel.before(createTableSave);
+
+  const menu=document.createElement('div');
+  menu.id='recordContextMenu';
+  menu.className='hidden';
+  menu.innerHTML='<button type="button">复制整条记录</button>';
+  document.body.append(menu);
+  let recordToCopy=null;
+
+  const hideRecordMenu=()=>{menu.classList.add('hidden');recordToCopy=null};
+  const copyText=async text=>{
+    if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(text);return}
+    const textarea=document.createElement('textarea');
+    textarea.value=text;textarea.setAttribute('readonly','');
+    textarea.style.cssText='position:fixed;left:-9999px;top:0';
+    document.body.append(textarea);textarea.select();
+    const copied=document.execCommand('copy');textarea.remove();
+    if(!copied)throw new Error('浏览器未允许访问剪贴板');
+  };
+  const openRecordMenu=(event,row)=>{
+    if(!event.target.closest('td')||event.target.closest('button,input,select,textarea'))return;
+    event.preventDefault();recordToCopy=row;
+    menu.style.left=`${Math.max(6,Math.min(event.clientX,window.innerWidth-170))}px`;
+    menu.style.top=`${Math.max(6,Math.min(event.clientY,window.innerHeight-44))}px`;
+    menu.classList.remove('hidden');
+  };
+  menu.querySelector('button').onclick=async()=>{
+    if(!recordToCopy)return;
+    try{await copyText(JSON.stringify(recordToCopy,null,2));notice('整条记录已复制到剪贴板')}catch(error){notice(`复制失败：${error.message}`)}finally{hideRecordMenu()}
+  };
+  document.addEventListener('pointerdown',event=>{if(!menu.contains(event.target))hideRecordMenu()});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape')hideRecordMenu()});
+  window.addEventListener('resize',hideRecordMenu);
+  window.addEventListener('scroll',hideRecordMenu,true);
+
+  const renderTableBeforeRecordMenu=renderTable;
+  renderTable=function(result,save=true){
+    renderTableBeforeRecordMenu(result,save);
+    document.querySelectorAll('#body tr').forEach((rowElement,index)=>{
+      rowElement.oncontextmenu=event=>openRecordMenu(event,result.rows[index]);
+    });
+  };
+})();
+</script>
+<script>
+(()=>{
+  const originalApi=api;
+  let operationDepth=0;
+  const overlay=document.createElement('dialog');
+  overlay.className='operation-overlay';
+  overlay.setAttribute('aria-label','正在执行删除操作');
+  overlay.innerHTML='<div class="operation-loader" role="status" aria-live="assertive"><span class="operation-spinner" aria-hidden="true"></span><span>正在执行操作…</span></div>';
+  document.body.append(overlay);
+  const style=document.createElement('style');
+  style.textContent='.operation-overlay{margin:auto;padding:0;border:0;border-radius:14px;background:transparent;color:#fff;box-shadow:none}.operation-overlay::backdrop{background:rgba(17,33,58,.58);cursor:wait}.operation-loader{display:flex;align-items:center;gap:12px;padding:18px 22px;border-radius:12px;background:#1d2d45;box-shadow:0 18px 50px #0006;font-weight:650}.operation-spinner{width:22px;height:22px;border:3px solid #ffffff4d;border-top-color:#fff;border-radius:50%;animation:operation-spin .75s linear infinite}@keyframes operation-spin{to{transform:rotate(360deg)}}body.dark .operation-loader{background:#263b5a}';
+  document.head.append(style);
+  function isDeleteOperation(path,options={}){
+    const method=String(options.method||'GET').toUpperCase();
+    const body=typeof options.body==='string'?options.body:'';
+    return method==='DELETE'||path==='/api/rows/delete'||(path==='/api/table-action'&&/"action"\\s*:\\s*"truncate"/i.test(body))||(path==='/api/sql'&&/\\b(delete|drop|truncate)\\b/i.test(body));
+  }
+  function beginDeleteOperation(){
+    operationDepth++;
+    if(operationDepth===1&&!overlay.open)overlay.showModal();
+  }
+  function endDeleteOperation(){
+    operationDepth=Math.max(0,operationDepth-1);
+    if(operationDepth===0&&overlay.open)overlay.close();
+  }
+  api=async function(path,options={}){
+    const deleting=isDeleteOperation(path,options);
+    if(deleting)beginDeleteOperation();
+    try{
+      const result=await originalApi(path,options);
+      if(deleting)notice('操作成功');
+      return result;
+    }finally{
+      if(deleting)endDeleteOperation();
+    }
+  };
+})();
+</script>
+<script>
+(()=>{
+  const transferCard=$('transferOverlay')?.querySelector('.backup-card');
+  if(transferCard&&!transferCard.querySelector('.transfer-spinner')){
+    const spinner=document.createElement('span');
+    spinner.className='transfer-spinner';
+    spinner.setAttribute('aria-hidden','true');
+    transferCard.prepend(spinner);
+  }
+  const transferStyle=document.createElement('style');
+  transferStyle.textContent='.transfer-spinner{display:block;width:30px;height:30px;margin:0 auto 4px;border:4px solid #1769e040;border-top-color:var(--blue);border-radius:50%;animation:transfer-spin .75s linear infinite}@keyframes transfer-spin{to{transform:rotate(360deg)}}';
+  document.head.append(transferStyle);
+  $('importForm').onsubmit=async event=>{
+    event.preventDefault();
+    const file=$('sqlFile').files[0],schema=$('importTargetSchema').value;
+    if(!file||!schema){showErrorDialog('无法导入','请选择 SQL 文件和目标数据库');return}
+    if(!confirm(`确定将 ${file.name} 导入到数据库 ${schema}？备份中的同名表可能被替换。`))return;
+    const form=new FormData();
+    form.append('schema',schema);
+    form.append('file',file);
+    form.append('compatibilityMode','1');
+    $('importDialog').close();
+    showTransferProgress('正在上传 SQL 文件',`准备上传 ${file.name}…`,0);
+    await new Promise(requestAnimationFrame);
+    try{
+      await uploadSQLImport(form);
+      await loadTree();
+      if(state.schema===schema&&state.table)await loadRows();
+      hideTransferProgress();
+      notice('操作成功');
+    }catch(error){
+      hideTransferProgress();
+      showErrorDialog('导入失败',error.message);
+    }
+  };
+})();
+</script>
+<style id="filter-row-refinement">
+#navicatFilterToolbar,.navicat-filter-toolbar{border-bottom:0!important}
+.navicat-filter-zone .filter-row{border-bottom:0!important}
+.navicat-filter-zone .filter-row input[type="checkbox"]{width:14px!important;min-width:14px!important;height:14px!important;padding:0!important;border-radius:3px!important}
+</style>
+<style id="multi-sort-rules">
+#navicatSortPanel{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap}
+#tablePanel .navicat-filter-zone.navicat-filter-closed .filter-logic,#tablePanel .navicat-filter-zone.navicat-filter-closed .filter-list{display:none!important}
+#navicatSortPanel>strong{padding-top:7px}
+.navicat-sort-rules{display:flex;flex-direction:column;gap:6px;min-width:min(520px,100%)}
+.navicat-sort-rule{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.navicat-sort-rule-number{width:20px;color:var(--muted);font-weight:650;text-align:right}
+.navicat-sort-rule select{height:30px;padding:4px 7px;border-radius:3px!important}
+.navicat-sort-rule [data-sort-column]{min-width:170px}
+.navicat-sort-rule button{padding:5px 8px;font-size:12px}
+.navicat-sort-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:28px}
+</style>
+<script>
+(()=>{
+  const maxSortRules=8;
+  const direction=value=>String(value).toUpperCase()==='DESC'?'DESC':'ASC';
+  const legacyRules=()=>state.sortColumn?[{column:state.sortColumn,direction:direction(state.sortDirection)}]:[];
+  const currentRules=()=>{const rules=Array.isArray(state.sortRules)?state.sortRules.filter(rule=>rule&&rule.column).map(rule=>({column:rule.column,direction:direction(rule.direction)})):legacyRules();return rules.length?rules:[{column:'',direction:'ASC'}]};
+  function setRules(rules){
+    state.sortRules=rules.filter(rule=>rule&&rule.column).map(rule=>({column:rule.column,direction:direction(rule.direction)}));
+    const first=state.sortRules[0];
+    state.sortColumn=first?first.column:'';
+    state.sortDirection=first?first.direction:'';
+  }
+  function columnOptions(selected){
+    return '<option value="">请选择字段</option>'+(state.columns||[]).map(column=>`<option value="${esc(column.name)}" ${column.name===selected?'selected':''}>${esc(column.name)}</option>`).join('');
+  }
+  function renderMultiSortPanel(panel){
+    const toolbar=$('navicatFilterToolbar');
+    if(toolbar&&panel.parentElement===toolbar.parentElement)toolbar.before(panel);
+    const rules=currentRules();
+    panel.dataset.multiSortRules='1';
+    panel.innerHTML=`<strong>排序规则</strong><div class="navicat-sort-rules">${rules.map((rule,index)=>`<div class="navicat-sort-rule"><span class="navicat-sort-rule-number">${index+1}</span><select data-sort-column>${columnOptions(rule.column)}</select><select data-sort-direction><option value="ASC" ${rule.direction==='ASC'?'selected':''}>升序 (ASC)</option><option value="DESC" ${rule.direction==='DESC'?'selected':''}>降序 (DESC)</option></select><button type="button" class="secondary" data-sort-move="up" data-sort-index="${index}" ${index===0?'disabled':''}>上移</button><button type="button" class="secondary" data-sort-move="down" data-sort-index="${index}" ${index===rules.length-1?'disabled':''}>下移</button><button type="button" class="secondary" data-sort-remove="${index}">移除</button></div>`).join('')||'<span class="hint">暂未添加排序规则</span>'}<div class="navicat-sort-actions"><button type="button" id="navicatAddSort" ${rules.length>=maxSortRules?'disabled':''}>＋ 添加规则</button><button type="button" id="navicatApplySort">应用</button><button type="button" class="secondary" id="navicatClearSort">清除</button></div></div>`;
+    const readRules=()=>[...panel.querySelectorAll('.navicat-sort-rule')].map(row=>({column:row.querySelector('[data-sort-column]').value,direction:row.querySelector('[data-sort-direction]').value})).filter(rule=>rule.column);
+    panel.querySelectorAll('[data-sort-remove]').forEach(button=>button.onclick=()=>{const next=readRules();next.splice(Number(button.dataset.sortRemove),1);setRules(next);renderMultiSortPanel(panel)});
+    panel.querySelectorAll('[data-sort-move]').forEach(button=>button.onclick=()=>{const next=readRules(),index=Number(button.dataset.sortIndex),target=button.dataset.sortMove==='up'?index-1:index+1;[next[index],next[target]]=[next[target],next[index]];setRules(next);renderMultiSortPanel(panel)});
+    $('navicatAddSort').onclick=()=>{const next=readRules(),used=new Set(next.map(rule=>rule.column)),column=(state.columns||[]).find(item=>!used.has(item.name));if(!column){notice('没有可添加的排序字段');return}setRules([...next,{column:column.name,direction:'ASC'}]);renderMultiSortPanel(panel)};
+    $('navicatApplySort').onclick=async()=>{const next=readRules(),seen=new Set();if(next.some(rule=>seen.has(rule.column)||(seen.add(rule.column),false))){notice('排序字段不能重复');return}setRules(next);resetPaging();await loadRows();notice(next.length?'排序已应用':'已恢复默认排序')};
+    $('navicatClearSort').onclick=async()=>{setRules([]);resetPaging();await loadRows();renderMultiSortPanel(panel);notice('排序已清除')};
+  }
+  const observeSortPanel=()=>document.querySelectorAll('#navicatSortPanel:not([data-multi-sort-rules])').forEach(renderMultiSortPanel);
+  new MutationObserver(observeSortPanel).observe(document.body,{childList:true,subtree:true});
+  observeSortPanel();
+  document.addEventListener('click',event=>{
+    if(!event.target.closest('#navicatOpenFilters'))return;
+    const filter=document.querySelector('#tablePanel .filter');
+    if(!filter||filter.classList.contains('navicat-filter-closed')||state.filters.length)return;
+    const firstColumn=(state.columns||[])[0]||{};
+    state.filters.push({column:firstColumn.name||'',operator:'contains',value:'',enabled:true});
+    renderFilters();
+  });
+  const apiBeforeMultiSort=api;
+  api=async function(path,options={}){
+    if(typeof path==='string'&&path.startsWith('/api/rows?')&&Array.isArray(state.sortRules)){
+      const rules=currentRules();
+      const [base,query='']=path.split('?'),params=new URLSearchParams(query);
+      params.delete('sortColumn');params.delete('sortDirection');
+      rules.forEach(rule=>{params.append('sortColumn',rule.column);params.append('sortDirection',rule.direction)});
+      path=base+'?'+params;
+    }
+    return apiBeforeMultiSort(path,options);
+  };
+  const saveActiveTabBeforeMultiSort=saveActiveTab;
+  saveActiveTab=function(result){saveActiveTabBeforeMultiSort(result);const tab=state.tabs.find(item=>item.key===state.activeKey);if(tab?.snapshot)tab.snapshot.sortRules=clone(currentRules())};
+  const restoreTabBeforeMultiSort=restoreTab;
+  restoreTab=function(tab){restoreTabBeforeMultiSort(tab);if(Array.isArray(tab?.snapshot?.sortRules))setRules(clone(tab.snapshot.sortRules));else delete state.sortRules};
+  const renderTableBeforeMultiSort=renderTable;
+  renderTable=function(result,save=true){
+    renderTableBeforeMultiSort(result,save);
+    document.querySelectorAll('#head [data-sort]').forEach(header=>header.onclick=()=>{
+      const column=header.dataset.sort,active=currentRules()[0],next=!active||active.column!==column?[{column,direction:'ASC'}]:active.direction==='ASC'?[{column,direction:'DESC'}]:[];
+      setRules(next);resetPaging();loadRows();
+    });
+  };
+})();
+</script>
 </body></html>

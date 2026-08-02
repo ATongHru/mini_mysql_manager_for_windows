@@ -32,7 +32,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 )
 
-//go:embed web/index.html
+//go:embed web/index.html web/favicon.svg web/favicon.ico
 var webFiles embed.FS
 
 var defaultPassword = ""
@@ -63,6 +63,11 @@ type server struct {
 	resourceMu      sync.Mutex
 	lastCPUTime     uint64
 	lastCPUAt       time.Time
+	metadataMu      sync.RWMutex
+	metadata        metadataCache
+	transactionMu   sync.Mutex
+	activeTransaction *sql.Tx
+	transactionAt   time.Time
 }
 
 type column struct {
@@ -83,6 +88,20 @@ type rowRequest struct {
 	Table      string         `json:"table"`
 	PrimaryKey map[string]any `json:"primaryKey"`
 	Data       map[string]any `json:"data"`
+}
+
+type transactionRequest struct {
+	Action string `json:"action"`
+}
+
+// statementExecutor is deliberately shared by sql.DB and sql.Tx.  When a
+// table transaction is active, every grid read and record mutation uses this
+// executor so the browser can immediately see its own uncommitted changes.
+type statementExecutor interface {
+	Exec(query string, args ...any) (sql.Result, error)
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	Query(query string, args ...any) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
 }
 
 type connectionRequest struct {
@@ -145,6 +164,7 @@ type columnTypeRequest struct {
 	Schema   string `json:"schema"`
 	Table    string `json:"table"`
 	Column   string `json:"column"`
+	NewName  string `json:"newName"`
 	Type     string `json:"type"`
 	Nullable *bool  `json:"nullable"`
 	Primary  *bool  `json:"primary"`
@@ -167,9 +187,13 @@ type savedConnection struct {
 }
 
 type savedSQLQuery struct {
-	Name   string `json:"name"`
-	Schema string `json:"schema"`
-	SQL    string `json:"sql"`
+	Name           string `json:"name"`
+	Schema         string `json:"schema"`
+	SQL            string `json:"sql"`
+	ConnectionName string `json:"connectionName"`
+	ConnectionHost string `json:"connectionHost"`
+	ConnectionPort string `json:"connectionPort"`
+	ConnectionUser string `json:"connectionUser"`
 }
 
 type appConfig struct {
@@ -220,6 +244,21 @@ type permissionSnapshot struct {
 	GlobalPrivileges []string             `json:"globalPrivileges"`
 }
 
+// cachedTable is the server-side copy of the object browser's table metadata.
+// It deliberately contains only lightweight metadata, never table rows.
+type cachedTable struct {
+	Name             string `json:"name"`
+	Type             string `json:"type"`
+	RecordCount      *int64 `json:"recordCount,omitempty"`
+	RecordCountExact bool   `json:"recordCountExact"`
+}
+
+type metadataCache struct {
+	Databases   []string
+	Tables      map[string][]cachedTable
+	Permissions *permissionSnapshot
+}
+
 func main() {
 	addr := flag.String("addr", env("MYSQL_MANAGER_ADDR", "127.0.0.1:8080"), "web listen address")
 	host := flag.String("mysql-host", env("MYSQL_HOST", ""), "initial MySQL host")
@@ -239,7 +278,7 @@ func main() {
 			log.Printf("无法创建配置文件 %s: %v", configPath, err)
 		}
 	}
-	s := &server{host: *host, port: *port, user: *user, password: *password, passwordDefault: *password, backupJobs: make(map[string]*backupJob), config: config, configPath: configPath}
+	s := &server{host: *host, port: *port, user: *user, password: *password, passwordDefault: *password, backupJobs: make(map[string]*backupJob), config: config, configPath: configPath, metadata: metadataCache{Tables: make(map[string][]cachedTable)}}
 	if strings.TrimSpace(*host) != "" {
 		if db, err := openDatabase(*host, *port, *user, *password, ""); err != nil {
 			log.Printf("initial MySQL connection unavailable: %v", err)
@@ -253,9 +292,11 @@ func main() {
 	mux.HandleFunc("/api/resources", s.resources)
 	mux.HandleFunc("/api/settings", s.settings)
 	mux.HandleFunc("/api/connection", s.connection)
+	mux.HandleFunc("/api/metadata", s.metadataSnapshot)
 	mux.HandleFunc("/api/connect", s.connect)
 	mux.HandleFunc("/api/test-connection", s.testConnection)
 	mux.HandleFunc("/api/disconnect", s.disconnect)
+	mux.HandleFunc("/api/transaction", s.transaction)
 	mux.HandleFunc("/api/sql", s.executeSQL)
 	mux.HandleFunc("/api/sql-export", s.exportSQLQuery)
 	mux.HandleFunc("/api/sql-complete", s.sqlComplete)
@@ -263,6 +304,7 @@ func main() {
 	mux.HandleFunc("/api/database-options", s.databaseOptions)
 	mux.HandleFunc("/api/database", s.database)
 	mux.HandleFunc("/api/tables", s.tables)
+	mux.HandleFunc("/api/table-count", s.tableCount)
 	mux.HandleFunc("/api/rows", s.rows)
 	mux.HandleFunc("/api/row", s.row)
 	mux.HandleFunc("/api/rows/delete", s.deleteRows)
@@ -274,7 +316,10 @@ func main() {
 	mux.HandleFunc("/api/table-action", s.tableAction)
 	mux.HandleFunc("/api/index", s.tableIndex)
 	mux.HandleFunc("/api/table-create", s.tableCreateSQL)
+	mux.HandleFunc("/api/table-info", s.tableInfo)
 	mux.HandleFunc("/api/backup", s.backup)
+	mux.HandleFunc("/favicon.svg", s.favicon)
+	mux.HandleFunc("/favicon.ico", s.faviconICO)
 	mux.HandleFunc("/", s.index)
 	listener, err := net.Listen("tcp", *addr)
 	if err != nil {
@@ -291,12 +336,84 @@ func main() {
 }
 
 func openLocalBrowser(localURL string) {
-	// Let the Windows shell launch the URL as a single navigation. Calling the
-	// legacy url.dll protocol handler can make a closed browser open both its
-	// startup page and the requested local page.
+	// When the default browser is not already running, launching the URL through
+	// the http protocol handler (cmd start / rundll32 url.dll) makes a
+	// cold-started browser open both its configured startup/home page and the
+	// requested local page. For Chromium-based browsers (Edge, Chrome, ...) we
+	// launch the executable directly with --app=<url>, which opens the page in a
+	// standalone window and does not trigger the startup pages.
+	if exe, ok := defaultBrowserExe(); ok && isChromiumBrowser(exe) {
+		if err := exec.Command(exe, "--app="+localURL).Start(); err == nil {
+			return
+		}
+	}
+	// Fallback: let the Windows shell open the URL.
 	if err := exec.Command("cmd.exe", "/c", "start", "", localURL).Start(); err != nil {
 		log.Printf("could not open browser automatically: %v", err)
 	}
+}
+
+// defaultBrowserExe resolves the executable path of the default HTTP browser
+// from the Windows registry. It returns ok=false when the default browser
+// cannot be determined.
+func defaultBrowserExe() (string, bool) {
+	progID := regQueryString(`HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice`, "ProgId")
+	if progID == "" {
+		return "", false
+	}
+	command := regQueryString(`HKCR\`+progID+`\shell\open\command`, "")
+	if command == "" {
+		return "", false
+	}
+	return extractExePath(command), true
+}
+
+// extractExePath pulls the leading executable path out of a registry shell
+// command template such as `"C:\...\msedge.exe" --single-argument %1`.
+func extractExePath(command string) string {
+	command = strings.TrimSpace(command)
+	if strings.HasPrefix(command, `"`) {
+		if end := strings.Index(command[1:], `"`); end >= 0 {
+			return command[1 : 1+end]
+		}
+	}
+	if idx := strings.IndexByte(command, ' '); idx >= 0 {
+		return command[:idx]
+	}
+	return command
+}
+
+// isChromiumBrowser reports whether the executable belongs to a Chromium-based
+// browser that understands the --app=<url> flag.
+func isChromiumBrowser(exePath string) bool {
+	switch strings.ToLower(filepath.Base(exePath)) {
+	case "msedge.exe", "chrome.exe", "chromium.exe", "brave.exe", "vivaldi.exe":
+		return true
+	}
+	return false
+}
+
+// regQueryString reads a REG_SZ value from the Windows registry via reg.exe.
+// An empty name queries the default value. It returns "" when the value cannot
+// be read.
+func regQueryString(key, name string) string {
+	args := []string{"query", key}
+	if name == "" {
+		args = append(args, "/ve")
+	} else {
+		args = append(args, "/v", name)
+	}
+	out, err := exec.Command("reg", args...).Output()
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if idx := strings.Index(line, "REG_SZ"); idx >= 0 {
+			return strings.TrimSpace(line[idx+len("REG_SZ"):])
+		}
+	}
+	return ""
 }
 
 func env(key, fallback string) string {
@@ -315,6 +432,44 @@ func applicationConfigPath() string {
 		return filepath.Join(filepath.Dir(executable), "mysql-manage.json")
 	}
 	return "mysql-manage.json"
+}
+
+// createExportFile reserves a new file beside the running EXE. Exporting is a
+// local desktop operation, so keeping the result next to the application makes
+// it discoverable without relying on the browser's download configuration.
+func createExportFile(filename string) (*os.File, string, error) {
+	executable, err := os.Executable()
+	if err != nil {
+		return nil, "", fmt.Errorf("无法确定程序目录: %w", err)
+	}
+	directory := filepath.Dir(executable)
+	extension := filepath.Ext(filename)
+	base := strings.TrimSuffix(filename, extension)
+	for index := 0; ; index++ {
+		candidate := filename
+		if index > 0 {
+			candidate = fmt.Sprintf("%s-%d%s", base, index, extension)
+		}
+		path := filepath.Join(directory, candidate)
+		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+		if errors.Is(err, os.ErrExist) {
+			continue
+		}
+		if err != nil {
+			return nil, "", err
+		}
+		return file, path, nil
+	}
+}
+
+func finishExportFile(w http.ResponseWriter, file *os.File, path string) bool {
+	if err := file.Close(); err != nil {
+		_ = os.Remove(path)
+		writeError(w, http.StatusInternalServerError, "导出文件保存失败: "+err.Error())
+		return false
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"message": "导出完成", "path": path, "filename": filepath.Base(path)})
+	return true
 }
 
 func loadAppConfig(path string) appConfig {
@@ -367,6 +522,34 @@ func (s *server) index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write(data)
+}
+func (s *server) favicon(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w)
+		return
+	}
+	data, err := webFiles.ReadFile("web/favicon.svg")
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "image/svg+xml")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	_, _ = w.Write(data)
+}
+func (s *server) faviconICO(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w)
+		return
+	}
+	data, err := webFiles.ReadFile("web/favicon.ico")
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "image/x-icon")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
 	_, _ = w.Write(data)
 }
 func (s *server) health(w http.ResponseWriter, r *http.Request) {
@@ -559,9 +742,147 @@ func (s *server) connection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.RLock()
-	host, port, user, params, connected := s.host, s.port, s.user, s.params, s.db != nil
+	host, port, user, params, db := s.host, s.port, s.user, s.params, s.db
 	s.mu.RUnlock()
-	writeJSON(w, 200, map[string]any{"connected": connected, "host": host, "port": port, "user": user, "params": params, "passwordDefault": s.passwordDefault})
+	response := map[string]any{"connected": db != nil, "host": host, "port": port, "user": user, "params": params, "passwordDefault": s.passwordDefault}
+	if db != nil {
+		permissions, ok := s.cachedPermissions()
+		if !ok {
+			ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+			var err error
+			permissions, err = databasePermissions(ctx, db)
+			cancel()
+			if err == nil {
+				s.cachePermissions(permissions)
+				ok = true
+			}
+		}
+		if ok {
+			response["permissions"] = permissions
+		}
+	}
+	writeJSON(w, 200, response)
+}
+
+func cloneCachedTables(source []cachedTable) []cachedTable {
+	result := make([]cachedTable, len(source))
+	for index, item := range source {
+		result[index] = item
+		if item.RecordCount != nil {
+			count := *item.RecordCount
+			result[index].RecordCount = &count
+		}
+	}
+	return result
+}
+
+func (s *server) cachePermissions(permissions permissionSnapshot) {
+	databaseNames := make([]string, 0, len(permissions.Databases))
+	for _, item := range permissions.Databases {
+		databaseNames = append(databaseNames, item.Database)
+	}
+	s.metadataMu.Lock()
+	s.metadata.Permissions = &permissions
+	s.metadata.Databases = databaseNames
+	s.metadata.Tables = make(map[string][]cachedTable)
+	s.metadataMu.Unlock()
+}
+
+func (s *server) cachedPermissions() (permissionSnapshot, bool) {
+	s.metadataMu.RLock()
+	defer s.metadataMu.RUnlock()
+	if s.metadata.Permissions == nil {
+		return permissionSnapshot{}, false
+	}
+	return *s.metadata.Permissions, true
+}
+
+func (s *server) cacheDatabases(databases []string) {
+	s.metadataMu.Lock()
+	s.metadata.Databases = append([]string(nil), databases...)
+	if s.metadata.Tables == nil {
+		s.metadata.Tables = make(map[string][]cachedTable)
+	}
+	s.metadataMu.Unlock()
+}
+
+func (s *server) cachedDatabases() ([]string, bool) {
+	s.metadataMu.RLock()
+	defer s.metadataMu.RUnlock()
+	if s.metadata.Databases == nil {
+		return nil, false
+	}
+	return append([]string(nil), s.metadata.Databases...), true
+}
+
+func (s *server) cacheTables(schema string, tables []cachedTable) {
+	s.metadataMu.Lock()
+	if s.metadata.Tables == nil {
+		s.metadata.Tables = make(map[string][]cachedTable)
+	}
+	s.metadata.Tables[schema] = cloneCachedTables(tables)
+	s.metadataMu.Unlock()
+}
+
+func (s *server) cachedTables(schema string) ([]cachedTable, bool) {
+	s.metadataMu.RLock()
+	defer s.metadataMu.RUnlock()
+	tables, ok := s.metadata.Tables[schema]
+	return cloneCachedTables(tables), ok
+}
+
+func (s *server) cacheTableCount(schema, table string, count int64) {
+	s.metadataMu.Lock()
+	defer s.metadataMu.Unlock()
+	for index := range s.metadata.Tables[schema] {
+		item := &s.metadata.Tables[schema][index]
+		if item.Name == table {
+			item.RecordCount = &count
+			item.RecordCountExact = true
+			return
+		}
+	}
+}
+
+func (s *server) invalidateCachedTableCount(schema, table string) {
+	s.metadataMu.Lock()
+	defer s.metadataMu.Unlock()
+	for index := range s.metadata.Tables[schema] {
+		item := &s.metadata.Tables[schema][index]
+		if item.Name == table {
+			item.RecordCount = nil
+			item.RecordCountExact = false
+			return
+		}
+	}
+}
+
+func (s *server) clearMetadataCache() {
+	s.metadataMu.Lock()
+	s.metadata = metadataCache{Tables: make(map[string][]cachedTable)}
+	s.metadataMu.Unlock()
+}
+
+// metadataSnapshot returns the cached object-browser data to a freshly loaded
+// page. The cache survives browser refreshes while the local manager is running.
+func (s *server) metadataSnapshot(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w)
+		return
+	}
+	s.metadataMu.RLock()
+	databases := append([]string(nil), s.metadata.Databases...)
+	tables := make(map[string][]cachedTable, len(s.metadata.Tables))
+	for schema, items := range s.metadata.Tables {
+		tables[schema] = cloneCachedTables(items)
+	}
+	var permissions *permissionSnapshot
+	if s.metadata.Permissions != nil {
+		copy := *s.metadata.Permissions
+		permissions = &copy
+	}
+	s.metadataMu.RUnlock()
+	writeJSON(w, http.StatusOK, map[string]any{"databases": databases, "tables": tables, "permissions": permissions})
 }
 
 func normalizeConnectionRequest(request *connectionRequest) error {
@@ -654,6 +975,7 @@ func (s *server) connect(w http.ResponseWriter, r *http.Request) {
 		writeDBError(w, err)
 		return
 	}
+	s.rollbackActiveTransaction()
 	s.mu.Lock()
 	old := s.db
 	s.db, s.host, s.port, s.user, s.password, s.params = db, request.Host, request.Port, request.User, request.Password, request.Params
@@ -661,6 +983,7 @@ func (s *server) connect(w http.ResponseWriter, r *http.Request) {
 	if old != nil {
 		_ = old.Close()
 	}
+	s.cachePermissions(permissions)
 	writeJSON(w, 200, map[string]any{"message": "MySQL 连接成功", "host": request.Host, "port": request.Port, "user": request.User, "params": request.Params, "permissions": permissions})
 }
 
@@ -669,6 +992,7 @@ func (s *server) disconnect(w http.ResponseWriter, r *http.Request) {
 		methodNotAllowed(w)
 		return
 	}
+	s.rollbackActiveTransaction()
 	s.mu.Lock()
 	db := s.db
 	s.db, s.password, s.params = nil, "", ""
@@ -676,6 +1000,7 @@ func (s *server) disconnect(w http.ResponseWriter, r *http.Request) {
 	if db != nil {
 		_ = db.Close()
 	}
+	s.clearMetadataCache()
 	writeJSON(w, 200, map[string]string{"message": "已退出 MySQL 连接"})
 }
 
@@ -834,6 +1159,116 @@ func (s *server) currentDB() (*sql.DB, error) {
 	return db, nil
 }
 
+func (s *server) activeExecutor(db *sql.DB) (statementExecutor, bool, func()) {
+	s.transactionMu.Lock()
+	if s.activeTransaction != nil {
+		if !transactionUsable(s.activeTransaction) {
+			s.activeTransaction, s.transactionAt = nil, time.Time{}
+			s.transactionMu.Unlock()
+			return db, false, func() {}
+		}
+		return s.activeTransaction, true, s.transactionMu.Unlock
+	}
+	s.transactionMu.Unlock()
+	return db, false, func() {}
+}
+
+func transactionUsable(tx *sql.Tx) bool {
+	var probe int
+	return tx != nil && tx.QueryRow("SELECT 1").Scan(&probe) == nil
+}
+
+func (s *server) rollbackActiveTransaction() {
+	s.transactionMu.Lock()
+	tx := s.activeTransaction
+	s.activeTransaction, s.transactionAt = nil, time.Time{}
+	s.transactionMu.Unlock()
+	if tx != nil {
+		_ = tx.Rollback()
+	}
+}
+
+func (s *server) transaction(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		s.transactionMu.Lock()
+		if s.activeTransaction != nil && !transactionUsable(s.activeTransaction) {
+			s.activeTransaction, s.transactionAt = nil, time.Time{}
+		}
+		active, startedAt := s.activeTransaction != nil, s.transactionAt
+		s.transactionMu.Unlock()
+		response := map[string]any{"active": active}
+		if active {
+			response["startedAt"] = startedAt.Format(time.RFC3339)
+		}
+		writeJSON(w, http.StatusOK, response)
+		return
+	}
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+	var request transactionRequest
+	if err := decodeJSON(r, &request); err != nil {
+		writeError(w, http.StatusBadRequest, "事务请求无效")
+		return
+	}
+	action := strings.ToLower(strings.TrimSpace(request.Action))
+	switch action {
+	case "start":
+		db, err := s.currentDB()
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		s.transactionMu.Lock()
+		if s.activeTransaction != nil && !transactionUsable(s.activeTransaction) {
+			s.activeTransaction, s.transactionAt = nil, time.Time{}
+		}
+		if s.activeTransaction != nil {
+			s.transactionMu.Unlock()
+			writeError(w, http.StatusConflict, "当前已有正在进行的事务")
+			return
+		}
+		tx, err := db.BeginTx(r.Context(), nil)
+		if err == nil {
+			s.activeTransaction, s.transactionAt = tx, time.Now()
+		}
+		s.transactionMu.Unlock()
+		if err != nil {
+			writeDBError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"active": true, "message": "事务已开始"})
+	case "commit", "rollback":
+		s.transactionMu.Lock()
+		tx := s.activeTransaction
+		if tx == nil {
+			s.transactionMu.Unlock()
+			writeError(w, http.StatusBadRequest, "当前没有正在进行的事务")
+			return
+		}
+		var err error
+		if action == "commit" {
+			err = tx.Commit()
+		} else {
+			err = tx.Rollback()
+		}
+		s.activeTransaction, s.transactionAt = nil, time.Time{}
+		s.transactionMu.Unlock()
+		if err != nil {
+			writeDBError(w, err)
+			return
+		}
+		message := "事务已提交"
+		if action == "rollback" {
+			message = "事务已回滚"
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"active": false, "message": message})
+	default:
+		writeError(w, http.StatusBadRequest, "不支持的事务操作")
+	}
+}
+
 // verifyCurrentPassword opens a short-lived connection so destructive operations
 // are protected by the password currently configured for this MySQL connection.
 func (s *server) verifyCurrentPassword(password string) error {
@@ -867,6 +1302,10 @@ func (s *server) databases(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, err.Error())
 		return
 	}
+	if databases, ok := s.cachedDatabases(); ok {
+		writeJSON(w, http.StatusOK, map[string]any{"databases": databases})
+		return
+	}
 	rows, err := db.Query("SHOW DATABASES")
 	if err != nil {
 		writeDBError(w, err)
@@ -882,6 +1321,7 @@ func (s *server) databases(w http.ResponseWriter, r *http.Request) {
 		}
 		databases = append(databases, name)
 	}
+	s.cacheDatabases(databases)
 	writeJSON(w, 200, map[string]any{"databases": databases})
 }
 
@@ -965,6 +1405,7 @@ func (s *server) database(w http.ResponseWriter, r *http.Request) {
 			writeDBError(w, err)
 			return
 		}
+		s.clearMetadataCache()
 		writeJSON(w, 200, map[string]string{"message": "数据库已删除"})
 		return
 	}
@@ -1010,8 +1451,48 @@ func (s *server) database(w http.ResponseWriter, r *http.Request) {
 		writeDBError(w, err)
 		return
 	}
+	s.clearMetadataCache()
 	writeJSON(w, 201, map[string]string{"message": "数据库已创建", "name": name})
 }
+func (s *server) tableCount(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w)
+		return
+	}
+	schema, err := requiredIdentifier(r.URL.Query().Get("schema"), "数据库")
+	if err != nil {
+		writeError(w, 400, err.Error())
+		return
+	}
+	table, err := requiredIdentifier(r.URL.Query().Get("table"), "数据表")
+	if err != nil {
+		writeError(w, 400, err.Error())
+		return
+	}
+	db, err := s.currentDB()
+	if err != nil {
+		writeError(w, 400, err.Error())
+		return
+	}
+	if tables, ok := s.cachedTables(schema); ok {
+		for _, item := range tables {
+			if item.Name == table && item.RecordCount != nil && item.RecordCountExact {
+				writeJSON(w, http.StatusOK, map[string]any{"recordCount": *item.RecordCount, "recordCountExact": true})
+				return
+			}
+		}
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	var count int64
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+qualify(schema, table)).Scan(&count); err != nil {
+		writeDBError(w, err)
+		return
+	}
+	s.cacheTableCount(schema, table, count)
+	writeJSON(w, http.StatusOK, map[string]any{"recordCount": count, "recordCountExact": true})
+}
+
 func (s *server) tables(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		methodNotAllowed(w)
@@ -1026,6 +1507,20 @@ func (s *server) tables(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, 400, err.Error())
 		return
+	}
+	exactCounts := r.URL.Query().Get("includeCounts") == "1"
+	if cached, ok := s.cachedTables(schema); ok {
+		allExact := true
+		for _, item := range cached {
+			if item.Type == "BASE TABLE" && (!item.RecordCountExact || item.RecordCount == nil) {
+				allExact = false
+				break
+			}
+		}
+		if !exactCounts || allExact {
+			writeJSON(w, http.StatusOK, map[string]any{"tables": cached})
+			return
+		}
 	}
 	rows, err := db.QueryContext(r.Context(), `SELECT TABLE_NAME, TABLE_TYPE, TABLE_ROWS FROM information_schema.TABLES WHERE TABLE_SCHEMA=? ORDER BY TABLE_NAME`, schema)
 	if err != nil {
@@ -1057,14 +1552,13 @@ func (s *server) tables(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	list := make([]map[string]any, len(entries))
+	list := make([]cachedTable, len(entries))
 	countIndexes := make([]int, 0)
-	exactCounts := r.URL.Query().Get("includeCounts") == "1"
 	for index, entry := range entries {
-		item := map[string]any{"name": entry.name, "type": entry.kind}
+		item := cachedTable{Name: entry.name, Type: entry.kind, RecordCountExact: entry.kind != "BASE TABLE"}
 		if entry.estimated.Valid {
-			item["recordCount"] = entry.estimated.Int64
-			item["recordCountExact"] = entry.kind != "BASE TABLE"
+			count := entry.estimated.Int64
+			item.RecordCount = &count
 		}
 		list[index] = item
 		if exactCounts && entry.kind == "BASE TABLE" {
@@ -1111,10 +1605,12 @@ func (s *server) tables(w http.ResponseWriter, r *http.Request) {
 			if result.err != nil {
 				continue // Keep the TABLE_ROWS estimate already populated above.
 			}
-			list[result.index]["recordCount"] = result.count
-			list[result.index]["recordCountExact"] = true
+			count := result.count
+			list[result.index].RecordCount = &count
+			list[result.index].RecordCountExact = true
 		}
 	}
+	s.cacheTables(schema, list)
 	writeJSON(w, 200, map[string]any{"tables": list})
 }
 
@@ -1148,6 +1644,7 @@ func (s *server) table(w http.ResponseWriter, r *http.Request) {
 			writeDBError(w, err)
 			return
 		}
+		s.clearMetadataCache()
 		writeJSON(w, 200, map[string]string{"message": "数据表已删除"})
 		return
 	}
@@ -1256,6 +1753,7 @@ func (s *server) table(w http.ResponseWriter, r *http.Request) {
 		writeDBError(w, err)
 		return
 	}
+	s.clearMetadataCache()
 	writeJSON(w, 201, map[string]string{"message": "数据表已创建", "name": name})
 }
 func countIndexHint(db *sql.DB, schema, table string, q url.Values) string {
@@ -1327,11 +1825,14 @@ func (s *server) rows(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, err.Error())
 		return
 	}
+	filterWhere := where
 	db, err := s.currentDB()
 	if err != nil {
 		writeError(w, 400, err.Error())
 		return
 	}
+	executor, _, release := s.activeExecutor(db)
+	defer release()
 	sort, err := buildSort(q, meta)
 	if err != nil {
 		writeError(w, 400, err.Error())
@@ -1339,7 +1840,7 @@ func (s *server) rows(w http.ResponseWriter, r *http.Request) {
 	}
 	qualified := qualify(schema, table)
 	var total int64
-	if err := db.QueryRow("SELECT COUNT(*) FROM "+qualified+countIndexHint(db, schema, table, q)+where, args...).Scan(&total); err != nil {
+	if err := executor.QueryRow("SELECT COUNT(*) FROM "+qualified+countIndexHint(db, schema, table, q)+where, args...).Scan(&total); err != nil {
 		writeDBError(w, err)
 		return
 	}
@@ -1369,7 +1870,14 @@ func (s *server) rows(w http.ResponseWriter, r *http.Request) {
 		query += " OFFSET ?"
 		args = append(args, offset)
 	}
-	result, err := db.Query(query, args...)
+	queryPreview := ""
+	if filterWhere != "" {
+		queryPreview = query
+		for _, arg := range args {
+			queryPreview = strings.Replace(queryPreview, "?", sqlLiteral(arg), 1)
+		}
+	}
+	result, err := executor.Query(query, args...)
 	if err != nil {
 		writeDBError(w, err)
 		return
@@ -1435,7 +1943,7 @@ func (s *server) rows(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	writeJSON(w, 200, map[string]any{"columns": meta.Columns, "primaryKeys": meta.PrimaryKeys, "rows": data, "limit": limit, "offset": offset, "total": total, "hasMore": hasMore, "cursorMode": cursorMode, "nextCursor": nextCursor})
+	writeJSON(w, 200, map[string]any{"columns": meta.Columns, "primaryKeys": meta.PrimaryKeys, "rows": data, "limit": limit, "offset": offset, "total": total, "hasMore": hasMore, "cursorMode": cursorMode, "nextCursor": nextCursor, "queryPreview": queryPreview})
 }
 func (s *server) row(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost && r.Method != http.MethodPut && r.Method != http.MethodDelete {
@@ -1467,6 +1975,8 @@ func (s *server) row(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, err.Error())
 		return
 	}
+	executor, _, release := s.activeExecutor(db)
+	defer release()
 	allowed := map[string]bool{}
 	for _, col := range meta.Columns {
 		allowed[col.Name] = true
@@ -1494,12 +2004,13 @@ func (s *server) row(w http.ResponseWriter, r *http.Request) {
 		} else {
 			statement += " (" + strings.Join(columns, ",") + ") VALUES (" + strings.Join(placeholders, ",") + ")"
 		}
-		result, err := db.ExecContext(r.Context(), statement, values...)
+		result, err := executor.ExecContext(r.Context(), statement, values...)
 		if err != nil {
 			writeDBError(w, err)
 			return
 		}
 		id, _ := result.LastInsertId()
+		s.invalidateCachedTableCount(schema, table)
 		writeJSON(w, http.StatusCreated, map[string]any{"message": "记录已新增", "lastInsertId": id})
 		return
 	}
@@ -1516,12 +2027,13 @@ func (s *server) row(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodDelete {
-		res, err := db.Exec("DELETE FROM "+qualify(schema, table)+where, whereArgs...)
+		res, err := executor.Exec("DELETE FROM "+qualify(schema, table)+where, whereArgs...)
 		if err != nil {
 			writeDBError(w, err)
 			return
 		}
 		n, _ := res.RowsAffected()
+		s.invalidateCachedTableCount(schema, table)
 		writeJSON(w, 200, map[string]any{"deleted": n})
 		return
 	}
@@ -1540,7 +2052,7 @@ func (s *server) row(w http.ResponseWriter, r *http.Request) {
 		args = append(args, value)
 	}
 	args = append(args, whereArgs...)
-	res, err := db.Exec("UPDATE "+qualify(schema, table)+" SET "+strings.Join(setParts, ",")+where, args...)
+	res, err := executor.Exec("UPDATE "+qualify(schema, table)+" SET "+strings.Join(setParts, ",")+where, args...)
 	if err != nil {
 		writeDBError(w, err)
 		return
@@ -1594,33 +2106,46 @@ func (s *server) deleteRows(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, err.Error())
 		return
 	}
-	tx, err := db.BeginTx(r.Context(), nil)
-	if err != nil {
-		writeDBError(w, err)
-		return
+	executor, transactionActive, release := s.activeExecutor(db)
+	defer release()
+	var localTx *sql.Tx
+	if !transactionActive {
+		localTx, err = db.BeginTx(r.Context(), nil)
+		if err != nil {
+			writeDBError(w, err)
+			return
+		}
+		executor = localTx
 	}
 	var deleted int64
 	for _, primaryKey := range payload.PrimaryKeys {
 		where, args, err := primaryWhere(keys, primaryKey, allowed)
 		if err != nil {
-			_ = tx.Rollback()
+			if localTx != nil {
+				_ = localTx.Rollback()
+			}
 			writeError(w, 400, err.Error())
 			return
 		}
-		result, err := tx.Exec("DELETE FROM "+qualify(schema, table)+where, args...)
+		result, err := executor.Exec("DELETE FROM "+qualify(schema, table)+where, args...)
 		if err != nil {
-			_ = tx.Rollback()
+			if localTx != nil {
+				_ = localTx.Rollback()
+			}
 			writeDBError(w, err)
 			return
 		}
 		count, _ := result.RowsAffected()
 		deleted += count
 	}
-	if err := tx.Commit(); err != nil {
-		_ = tx.Rollback()
-		writeDBError(w, err)
-		return
+	if localTx != nil {
+		if err := localTx.Commit(); err != nil {
+			_ = localTx.Rollback()
+			writeDBError(w, err)
+			return
+		}
 	}
+	s.invalidateCachedTableCount(schema, table)
 	writeJSON(w, 200, map[string]any{"deleted": deleted})
 }
 
@@ -1730,8 +2255,17 @@ func (s *server) columnType(w http.ResponseWriter, r *http.Request) {
 	if targetPrimary {
 		targetNullable = false
 	}
+	targetName := columnName
+	if strings.TrimSpace(request.NewName) != "" {
+		targetName, err = requiredIdentifier(request.NewName, "新字段")
+		if err != nil {
+			writeError(w, 400, err.Error())
+			return
+		}
+	}
+	nameChanged := targetName != columnName
 	typeChanged := !strings.EqualFold(strings.TrimSpace(currentType), strings.TrimSpace(columnType))
-	if !typeChanged && targetNullable == currentNullable && request.Primary == nil {
+	if !nameChanged && !typeChanged && targetNullable == currentNullable && request.Primary == nil {
 		writeJSON(w, 200, map[string]string{"message": "字段定义未发生变化"})
 		return
 	}
@@ -1775,8 +2309,14 @@ func (s *server) columnType(w http.ResponseWriter, r *http.Request) {
 	if comment != "" {
 		definition += " COMMENT " + quoteSQL(comment)
 	}
-	if typeChanged || targetNullable != currentNullable {
-		if _, err := db.Exec("ALTER TABLE " + qualify(schema, table) + " MODIFY COLUMN " + quoteIdentifier(columnName) + " " + definition); err != nil {
+	if nameChanged || typeChanged || targetNullable != currentNullable {
+		statement := "ALTER TABLE " + qualify(schema, table)
+		if nameChanged {
+			statement += " CHANGE COLUMN " + quoteIdentifier(columnName) + " " + quoteIdentifier(targetName) + " " + definition
+		} else {
+			statement += " MODIFY COLUMN " + quoteIdentifier(columnName) + " " + definition
+		}
+		if _, err := db.Exec(statement); err != nil {
 			writeDBError(w, err)
 			return
 		}
@@ -1789,7 +2329,7 @@ func (s *server) columnType(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if targetPrimary {
-			keys = append(keys, columnName)
+			keys = append(keys, targetName)
 		}
 		currentKeys := strings.Join(meta.PrimaryKeys, "\x00")
 		targetKeys := strings.Join(keys, "\x00")
@@ -1814,7 +2354,12 @@ func (s *server) columnType(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	writeJSON(w, 200, map[string]string{"message": "字段定义已更新"})
+	message := "字段定义已更新"
+	if nameChanged {
+		message = "字段已重命名并保存"
+	}
+	s.clearMetadataCache()
+	writeJSON(w, 200, map[string]string{"message": message, "name": targetName})
 }
 
 func (s *server) tableAction(w http.ResponseWriter, r *http.Request) {
@@ -1852,6 +2397,7 @@ func (s *server) tableAction(w http.ResponseWriter, r *http.Request) {
 			writeDBError(w, err)
 			return
 		}
+		s.invalidateCachedTableCount(schema, table)
 		writeJSON(w, 200, map[string]string{"message": "数据表已清空"})
 	case "rename":
 		newName, err := requiredIdentifier(request.NewName, "新表")
@@ -1867,6 +2413,7 @@ func (s *server) tableAction(w http.ResponseWriter, r *http.Request) {
 			writeDBError(w, err)
 			return
 		}
+		s.clearMetadataCache()
 		writeJSON(w, 200, map[string]string{"message": "数据表已重命名", "name": newName})
 	default:
 		writeError(w, 400, "不支持的表操作")
@@ -1962,6 +2509,62 @@ func (s *server) tableCreateSQL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]string{"createSQL": createSQL})
+}
+
+func (s *server) tableInfo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w)
+		return
+	}
+	schema, err := requiredIdentifier(r.URL.Query().Get("schema"), "数据库")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	table, err := requiredIdentifier(r.URL.Query().Get("table"), "表")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	db, err := s.currentDB()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	executor, _, release := s.activeExecutor(db)
+	defer release()
+	var rowCount int64
+	if err := executor.QueryRow("SELECT COUNT(*) FROM " + qualify(schema, table)).Scan(&rowCount); err != nil {
+		writeDBError(w, err)
+		return
+	}
+	info := struct {
+		Engine, AutoIncrement, RowFormat, UpdateTime, CreateTime, CheckTime string
+		IndexLength, DataLength, MaxDataLength, DataFree                       int64
+		Collation, CreateOptions, Comment                                       string
+	}{}
+	err = db.QueryRow(`SELECT COALESCE(ENGINE,''), COALESCE(AUTO_INCREMENT,0), COALESCE(ROW_FORMAT,''),
+		COALESCE(DATE_FORMAT(UPDATE_TIME,'%Y-%m-%d %H:%i:%s'),''), COALESCE(DATE_FORMAT(CREATE_TIME,'%Y-%m-%d %H:%i:%s'),''), COALESCE(DATE_FORMAT(CHECK_TIME,'%Y-%m-%d %H:%i:%s'),''),
+		COALESCE(INDEX_LENGTH,0), COALESCE(DATA_LENGTH,0), COALESCE(MAX_DATA_LENGTH,0), COALESCE(DATA_FREE,0), COALESCE(TABLE_COLLATION,''), COALESCE(CREATE_OPTIONS,''), COALESCE(TABLE_COMMENT,'')
+		FROM information_schema.TABLES WHERE TABLE_SCHEMA=? AND TABLE_NAME=?`, schema, table).Scan(
+		&info.Engine, &info.AutoIncrement, &info.RowFormat, &info.UpdateTime, &info.CreateTime, &info.CheckTime,
+		&info.IndexLength, &info.DataLength, &info.MaxDataLength, &info.DataFree, &info.Collation, &info.CreateOptions, &info.Comment,
+	)
+	if err == sql.ErrNoRows {
+		writeError(w, http.StatusNotFound, "找不到指定的数据表")
+		return
+	}
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"schema": schema, "table": table, "rows": rowCount,
+		"engine": info.Engine, "autoIncrement": info.AutoIncrement, "rowFormat": info.RowFormat,
+		"updateTime": info.UpdateTime, "createTime": info.CreateTime, "checkTime": info.CheckTime,
+		"indexLength": info.IndexLength, "dataLength": info.DataLength, "maxDataLength": info.MaxDataLength, "dataFree": info.DataFree,
+		"collation": info.Collation, "createOptions": info.CreateOptions, "comment": info.Comment,
+	})
 }
 
 func (s *server) tableIndex(w http.ResponseWriter, r *http.Request) {
@@ -2180,6 +2783,7 @@ func (s *server) executeSQL(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		affected, _ := result.RowsAffected()
+		s.clearMetadataCache()
 		writeJSON(w, 200, map[string]any{"message": "SQL 执行成功", "affectedRows": affected, "durationMs": float64(time.Since(startedAt).Microseconds()) / 1000})
 		return
 	}
@@ -2346,11 +2950,25 @@ func (s *server) exportSQLQuery(w http.ResponseWriter, r *http.Request) {
 		selectedIndexes, selectedColumns = append(selectedIndexes, index), append(selectedColumns, name)
 	}
 	filename := "sql_query_" + time.Now().Format("20060102_150405") + ".csv"
-	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-	w.Header().Set("Content-Disposition", "attachment; filename*=UTF-8''"+url.PathEscape(filename))
-	_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
-	writer := csv.NewWriter(w)
+	file, path, err := createExportFile(filename)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "无法创建导出文件: "+err.Error())
+		return
+	}
+	completed := false
+	defer func() {
+		if !completed {
+			_ = file.Close()
+			_ = os.Remove(path)
+		}
+	}()
+	if _, err := file.Write([]byte{0xEF, 0xBB, 0xBF}); err != nil {
+		writeError(w, http.StatusInternalServerError, "写入导出文件失败: "+err.Error())
+		return
+	}
+	writer := csv.NewWriter(file)
 	if err := writer.Write(selectedColumns); err != nil {
+		writeError(w, http.StatusInternalServerError, "写入导出文件失败: "+err.Error())
 		return
 	}
 	for rows.Next() {
@@ -2359,6 +2977,7 @@ func (s *server) exportSQLQuery(w http.ResponseWriter, r *http.Request) {
 			refs[i] = &values[i]
 		}
 		if err := rows.Scan(refs...); err != nil {
+			writeDBError(w, err)
 			return
 		}
 		record := make([]string, len(selectedIndexes))
@@ -2366,10 +2985,20 @@ func (s *server) exportSQLQuery(w http.ResponseWriter, r *http.Request) {
 			record[i] = csvCell(values[index])
 		}
 		if err := writer.Write(record); err != nil {
+			writeError(w, http.StatusInternalServerError, "写入导出文件失败: "+err.Error())
 			return
 		}
 	}
 	writer.Flush()
+	if err := writer.Error(); err != nil {
+		writeError(w, http.StatusInternalServerError, "写入导出文件失败: "+err.Error())
+		return
+	}
+	if err := rows.Err(); err != nil {
+		writeDBError(w, err)
+		return
+	}
+	completed = finishExportFile(w, file, path)
 }
 
 func (s *server) sqlComplete(w http.ResponseWriter, r *http.Request) {
@@ -2711,25 +3340,39 @@ func decodeCursor(token string, expected int) ([]any, error) {
 }
 
 func buildSort(q url.Values, meta tableMeta) (string, error) {
-	columnName := strings.TrimSpace(q.Get("sortColumn"))
-	if columnName == "" {
+	columnNames := q["sortColumn"]
+	directions := q["sortDirection"]
+	if len(columnNames) == 0 || (len(columnNames) == 1 && strings.TrimSpace(columnNames[0]) == "") {
 		return "", nil
 	}
-	found := false
+	if len(columnNames) != len(directions) {
+		return "", errors.New("排序规则无效")
+	}
+	if len(columnNames) > 8 {
+		return "", errors.New("排序规则不能超过 8 条")
+	}
+	available := make(map[string]bool, len(meta.Columns))
 	for _, column := range meta.Columns {
-		if column.Name == columnName {
-			found = true
-			break
+		available[column.Name] = true
+	}
+	seen := make(map[string]bool, len(columnNames))
+	parts := make([]string, 0, len(columnNames))
+	for index, rawName := range columnNames {
+		columnName := strings.TrimSpace(rawName)
+		if !available[columnName] {
+			return "", errors.New("排序字段不存在")
 		}
+		if seen[columnName] {
+			return "", errors.New("排序字段不能重复")
+		}
+		seen[columnName] = true
+		direction := strings.ToUpper(strings.TrimSpace(directions[index]))
+		if direction != "ASC" && direction != "DESC" {
+			return "", errors.New("排序方向无效")
+		}
+		parts = append(parts, quoteIdentifier(columnName)+" "+direction)
 	}
-	if !found {
-		return "", errors.New("排序字段不存在")
-	}
-	direction := strings.ToUpper(strings.TrimSpace(q.Get("sortDirection")))
-	if direction != "ASC" && direction != "DESC" {
-		return "", errors.New("排序方向无效")
-	}
-	return " ORDER BY " + quoteIdentifier(columnName) + " " + direction, nil
+	return " ORDER BY " + strings.Join(parts, ","), nil
 }
 
 func primaryWhere(keys []string, provided map[string]any, allowed map[string]bool) (string, []any, error) {
