@@ -17,6 +17,7 @@ build.bat
 
 # Potentially sensitive database exports and logs
 *.sql
+*.csv
 *.log
 
 # Editor and OS files

@@ -47,27 +47,29 @@ var importUseStatement = regexp.MustCompile("(?is)^\\s*USE\\s+(?:`((?:``|[^`])+)
 var importDatabaseStatement = regexp.MustCompile("(?is)^(?:\\s*(?:--[^\\n]*(?:\\n|$)|#[^\\n]*(?:\\n|$)|/\\*.*?\\*/))*\\s*(?:CREATE|DROP|ALTER)\\s+(?:DATABASE|SCHEMA)\\b")
 
 type server struct {
-	mu              sync.RWMutex
-	db              *sql.DB
-	host            string
-	port            string
-	user            string
-	password        string
-	params          string
-	passwordDefault string
-	backupMu        sync.RWMutex
-	backupJobs      map[string]*backupJob
-	configMu        sync.RWMutex
-	config          appConfig
-	configPath      string
-	resourceMu      sync.Mutex
-	lastCPUTime     uint64
-	lastCPUAt       time.Time
-	metadataMu      sync.RWMutex
-	metadata        metadataCache
-	transactionMu   sync.Mutex
+	mu                sync.RWMutex
+	db                *sql.DB
+	host              string
+	port              string
+	user              string
+	password          string
+	params            string
+	passwordDefault   string
+	backupMu          sync.RWMutex
+	backupJobs        map[string]*backupJob
+	importMu          sync.RWMutex
+	importJobs        map[string]*importJob
+	configMu          sync.RWMutex
+	config            appConfig
+	configPath        string
+	resourceMu        sync.Mutex
+	lastCPUTime       uint64
+	lastCPUAt         time.Time
+	metadataMu        sync.RWMutex
+	metadata          metadataCache
+	transactionMu     sync.Mutex
 	activeTransaction *sql.Tx
-	transactionAt   time.Time
+	transactionAt     time.Time
 }
 
 type column struct {
@@ -278,7 +280,7 @@ func main() {
 			log.Printf("无法创建配置文件 %s: %v", configPath, err)
 		}
 	}
-	s := &server{host: *host, port: *port, user: *user, password: *password, passwordDefault: *password, backupJobs: make(map[string]*backupJob), config: config, configPath: configPath, metadata: metadataCache{Tables: make(map[string][]cachedTable)}}
+	s := &server{host: *host, port: *port, user: *user, password: *password, passwordDefault: *password, backupJobs: make(map[string]*backupJob), importJobs: make(map[string]*importJob), config: config, configPath: configPath, metadata: metadataCache{Tables: make(map[string][]cachedTable)}}
 	if strings.TrimSpace(*host) != "" {
 		if db, err := openDatabase(*host, *port, *user, *password, ""); err != nil {
 			log.Printf("initial MySQL connection unavailable: %v", err)
@@ -428,8 +430,8 @@ func getenv(key string) string {
 func getEnv(key string) string { return os.Getenv(key) }
 
 func applicationConfigPath() string {
-	if executable, err := os.Executable(); err == nil {
-		return filepath.Join(filepath.Dir(executable), "mysql-manage.json")
+	if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
+		return filepath.Join(home, ".mini-manage", "mysql-manage.json")
 	}
 	return "mysql-manage.json"
 }
@@ -493,6 +495,9 @@ func loadAppConfig(path string) appConfig {
 func saveAppConfig(path string, config appConfig) error {
 	data, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return err
 	}
 	return os.WriteFile(path, append(data, '\n'), 0644)
@@ -1286,10 +1291,6 @@ func (s *server) verifyCurrentPassword(password string) error {
 		return errors.New("当前 MySQL 连接密码验证失败")
 	}
 	return probe.Close()
-}
-
-func sqlNeedsPassword(statement string) bool {
-	return regexp.MustCompile(`(?i)\b(?:delete|drop|truncate)\b`).MatchString(statement)
 }
 
 func (s *server) databases(w http.ResponseWriter, r *http.Request) {
@@ -2389,10 +2390,6 @@ func (s *server) tableAction(w http.ResponseWriter, r *http.Request) {
 	}
 	switch strings.ToLower(strings.TrimSpace(request.Action)) {
 	case "truncate":
-		if err := s.verifyCurrentPassword(request.Password); err != nil {
-			writeError(w, 401, err.Error())
-			return
-		}
 		if _, err := db.Exec("TRUNCATE TABLE " + qualify(schema, table)); err != nil {
 			writeDBError(w, err)
 			return
@@ -2451,10 +2448,6 @@ func (s *server) tableColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodDelete {
-		if err := s.verifyCurrentPassword(request.Password); err != nil {
-			writeError(w, 401, err.Error())
-			return
-		}
 		if _, err := db.Exec("ALTER TABLE " + qualify(schema, table) + " DROP COLUMN " + quoteIdentifier(name)); err != nil {
 			writeDBError(w, err)
 			return
@@ -2540,8 +2533,8 @@ func (s *server) tableInfo(w http.ResponseWriter, r *http.Request) {
 	}
 	info := struct {
 		Engine, AutoIncrement, RowFormat, UpdateTime, CreateTime, CheckTime string
-		IndexLength, DataLength, MaxDataLength, DataFree                       int64
-		Collation, CreateOptions, Comment                                       string
+		IndexLength, DataLength, MaxDataLength, DataFree                    int64
+		Collation, CreateOptions, Comment                                   string
 	}{}
 	err = db.QueryRow(`SELECT COALESCE(ENGINE,''), COALESCE(AUTO_INCREMENT,0), COALESCE(ROW_FORMAT,''),
 		COALESCE(DATE_FORMAT(UPDATE_TIME,'%Y-%m-%d %H:%i:%s'),''), COALESCE(DATE_FORMAT(CREATE_TIME,'%Y-%m-%d %H:%i:%s'),''), COALESCE(DATE_FORMAT(CHECK_TIME,'%Y-%m-%d %H:%i:%s'),''),
@@ -2629,10 +2622,6 @@ func (s *server) tableIndex(w http.ResponseWriter, r *http.Request) {
 		}
 		if strings.EqualFold(name, "PRIMARY") {
 			writeError(w, 400, "请通过设计表功能管理主键")
-			return
-		}
-		if err := s.verifyCurrentPassword(request.Password); err != nil {
-			writeError(w, 401, err.Error())
 			return
 		}
 		db, err := s.currentDB()
@@ -2747,12 +2736,6 @@ func (s *server) executeSQL(w http.ResponseWriter, r *http.Request) {
 		request.Schema, err = requiredIdentifier(request.Schema, "数据库")
 		if err != nil {
 			writeError(w, 400, err.Error())
-			return
-		}
-	}
-	if sqlNeedsPassword(statement) {
-		if err := s.verifyCurrentPassword(request.Password); err != nil {
-			writeError(w, 401, err.Error())
 			return
 		}
 	}

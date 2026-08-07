@@ -8,6 +8,7 @@ import (
 	"compress/gzip"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -38,39 +39,364 @@ type backupJob struct {
 	Bytes      int64
 }
 
+// importJob stores a durable, cancellable SQL import running in the background.
+// Compressed files are streamed directly into the parser; their progress is an
+// estimate based on compressed bytes read, so no expanded SQL file is created.
+type importJob struct {
+	mu                 sync.RWMutex
+	ID                 string
+	Schema             string
+	Filename           string
+	InputPath          string
+	CompatibilityMode  bool
+	StartedAt          time.Time
+	Finished           bool
+	Success            bool
+	Cancelled          bool
+	Stage              string
+	Message            string
+	ProcessedBytes     int64
+	TotalBytes         int64
+	ProgressEstimated  bool
+	StatementsExecuted int64
+	cancel             context.CancelFunc
+}
+
+type importProgressReader struct {
+	reader io.Reader
+	job    *importJob
+}
+
+type contextReader struct {
+	ctx    context.Context
+	reader io.Reader
+}
+
+func (r *contextReader) Read(p []byte) (int, error) {
+	select {
+	case <-r.ctx.Done():
+		return 0, r.ctx.Err()
+	default:
+		return r.reader.Read(p)
+	}
+}
+
+func (r *importProgressReader) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	if n > 0 {
+		r.job.mu.Lock()
+		r.job.ProcessedBytes += int64(n)
+		if r.job.TotalBytes > 0 {
+			label := "已处理"
+			if r.job.ProgressEstimated {
+				label = "已读取压缩包"
+			}
+			r.job.Message = fmt.Sprintf("正在导入 SQL… %s %s / %s", label, formatImportBytes(r.job.ProcessedBytes), formatImportBytes(r.job.TotalBytes))
+		}
+		r.job.mu.Unlock()
+	}
+	return n, err
+}
+
+const (
+	fastImportBatchStatements = 500
+	fastImportBatchBytes      = 4 << 20
+)
+
+type importBatchFlusher interface {
+	Flush() error
+}
+
+// fastImportExecutor batches only ordinary data-changing statements. DDL,
+// explicit transactions, and all other SQL stay on the original sequential
+// path so import semantics remain predictable.
+type fastImportExecutor struct {
+	ctx        context.Context
+	conn       *sql.Conn
+	job        *importJob
+	statements []string
+	bytes      int
+	inScriptTx bool
+}
+
+func newFastImportExecutor(ctx context.Context, conn *sql.Conn, job *importJob) *fastImportExecutor {
+	return &fastImportExecutor{ctx: ctx, conn: conn, job: job, statements: make([]string, 0, fastImportBatchStatements)}
+}
+
+func (e *fastImportExecutor) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	if e.inScriptTx || !isFastImportStatement(query) {
+		if err := e.Flush(); err != nil {
+			return nil, err
+		}
+		result, err := e.conn.ExecContext(ctx, query, args...)
+		if err == nil {
+			recordImportedStatements(e.job, 1)
+		}
+		if isImportTransactionStart(query) {
+			e.inScriptTx = true
+		} else if isImportTransactionEnd(query) {
+			e.inScriptTx = false
+		}
+		return result, err
+	}
+	e.statements = append(e.statements, query)
+	e.bytes += len(query)
+	if len(e.statements) >= fastImportBatchStatements || e.bytes >= fastImportBatchBytes {
+		return nil, e.Flush()
+	}
+	return nil, nil
+}
+
+func (e *fastImportExecutor) Flush() error {
+	if len(e.statements) == 0 {
+		return nil
+	}
+	var batch strings.Builder
+	batch.Grow(e.bytes + 48)
+	batch.WriteString("START TRANSACTION;\n")
+	for _, statement := range e.statements {
+		batch.WriteString(statement)
+		batch.WriteString(";\n")
+	}
+	batch.WriteString("COMMIT")
+	if _, err := e.conn.ExecContext(e.ctx, batch.String()); err != nil {
+		return fmt.Errorf("执行快速导入批次失败: %w", err)
+	}
+	recordImportedStatements(e.job, int64(len(e.statements)))
+	e.statements = e.statements[:0]
+	e.bytes = 0
+	return nil
+}
+
+func recordImportedStatements(job *importJob, count int64) {
+	job.mu.Lock()
+	job.StatementsExecuted += count
+	job.Message = fmt.Sprintf("正在执行 SQL… 已完成 %d 条语句（快速批量导入）", job.StatementsExecuted)
+	job.mu.Unlock()
+}
+
+func importStatementFirstWord(statement string) string {
+	statement = strings.TrimSpace(statement)
+	if statement == "" {
+		return ""
+	}
+	if index := strings.IndexAny(statement, " \t\r\n"); index >= 0 {
+		return strings.ToUpper(statement[:index])
+	}
+	return strings.ToUpper(statement)
+}
+
+func isFastImportStatement(statement string) bool {
+	switch importStatementFirstWord(statement) {
+	case "INSERT", "REPLACE", "UPDATE", "DELETE":
+		return true
+	default:
+		return false
+	}
+}
+
+func isImportTransactionStart(statement string) bool {
+	word := importStatementFirstWord(statement)
+	return word == "BEGIN" || word == "START"
+}
+
+func isImportTransactionEnd(statement string) bool {
+	word := importStatementFirstWord(statement)
+	return word == "COMMIT" || word == "ROLLBACK"
+}
+
+func formatImportBytes(value int64) string {
+	if value < 1024 {
+		return fmt.Sprintf("%d B", value)
+	}
+	units := []string{"KB", "MB", "GB", "TB"}
+	amount := float64(value) / 1024
+	unit := 0
+	for amount >= 1024 && unit < len(units)-1 {
+		amount /= 1024
+		unit++
+	}
+	return fmt.Sprintf("%.2f %s", amount, units[unit])
+}
+
 func (s *server) importSQL(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+	switch r.Method {
+	case http.MethodPost:
+		s.startImport(w, r)
+	case http.MethodGet:
+		if r.URL.Query().Get("events") == "1" {
+			s.streamImportProgress(w, r)
+			return
+		}
+		s.importStatus(w, r)
+	case http.MethodDelete:
+		s.cancelImport(w, r)
+	default:
 		methodNotAllowed(w)
-		return
 	}
+}
+
+func (s *server) startImport(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
-		writeError(w, 400, "导入文件无效")
+		writeError(w, http.StatusBadRequest, "导入文件无效")
 		return
 	}
-	schema := strings.TrimSpace(r.FormValue("schema"))
-	compatibilityMode := r.FormValue("compatibilityMode") == "1"
-	if schema == "" {
-		writeError(w, 400, "请选择导入目标数据库")
-		return
-	}
-	var schemaErr error
-	schema, schemaErr = requiredIdentifier(schema, "数据库")
-	if schemaErr != nil {
-		writeError(w, 400, schemaErr.Error())
+	schema, err := requiredIdentifier(strings.TrimSpace(r.FormValue("schema")), "数据库")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		writeError(w, 400, "请选择 .sql 或 .sql.gz 文件")
+		writeError(w, http.StatusBadRequest, "请选择 .sql 或 .sql.gz 文件")
 		return
 	}
 	defer file.Close()
-	reader := io.Reader(file)
-	var gzipReader *gzip.Reader
-	if strings.HasSuffix(strings.ToLower(header.Filename), ".sql.gz") || strings.HasSuffix(strings.ToLower(header.Filename), ".gz") {
-		gzipReader, err = gzip.NewReader(reader)
-		if err != nil {
-			writeError(w, 400, "无法解压 .sql.gz 文件: "+err.Error())
+	lowerName := strings.ToLower(header.Filename)
+	if !strings.HasSuffix(lowerName, ".sql") && !strings.HasSuffix(lowerName, ".sql.gz") && !strings.HasSuffix(lowerName, ".gz") {
+		writeError(w, http.StatusBadRequest, "仅支持 .sql 或 .sql.gz 文件")
+		return
+	}
+	if _, err := s.currentDB(); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	input, err := os.CreateTemp("", "mysql-manage-import-*.upload")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "无法保存导入文件: "+err.Error())
+		return
+	}
+	inputPath := input.Name()
+	copied, copyErr := io.Copy(input, file)
+	closeErr := input.Close()
+	if copyErr != nil || closeErr != nil {
+		_ = os.Remove(inputPath)
+		if copyErr != nil {
+			writeError(w, http.StatusInternalServerError, "保存导入文件失败: "+copyErr.Error())
+		} else {
+			writeError(w, http.StatusInternalServerError, "保存导入文件失败: "+closeErr.Error())
+		}
+		return
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	job := &importJob{
+		ID:                fmt.Sprintf("import-%d", time.Now().UnixNano()),
+		Schema:            schema,
+		Filename:          header.Filename,
+		InputPath:         inputPath,
+		CompatibilityMode: r.FormValue("compatibilityMode") == "1",
+		StartedAt:         time.Now(),
+		Stage:             "queued",
+		Message:           fmt.Sprintf("文件已接收（%s），等待导入…", formatImportBytes(copied)),
+		cancel:            cancel,
+	}
+	s.importMu.Lock()
+	s.importJobs[job.ID] = job
+	s.importMu.Unlock()
+	go s.runImport(ctx, job)
+	writeJSON(w, http.StatusAccepted, map[string]string{"id": job.ID})
+}
+
+func (s *server) importJob(id string) *importJob {
+	s.importMu.RLock()
+	job := s.importJobs[id]
+	s.importMu.RUnlock()
+	return job
+}
+
+func importJobSnapshot(job *importJob) map[string]any {
+	job.mu.RLock()
+	defer job.mu.RUnlock()
+	return map[string]any{
+		"id": job.ID, "schema": job.Schema, "filename": job.Filename,
+		"finished": job.Finished, "success": job.Success, "cancelled": job.Cancelled,
+		"stage": job.Stage, "message": job.Message, "processedBytes": job.ProcessedBytes,
+		"totalBytes": job.TotalBytes, "progressEstimated": job.ProgressEstimated, "statementsExecuted": job.StatementsExecuted,
+	}
+}
+
+func (s *server) importStatus(w http.ResponseWriter, r *http.Request) {
+	job := s.importJob(strings.TrimSpace(r.URL.Query().Get("id")))
+	if job == nil {
+		writeError(w, http.StatusNotFound, "找不到导入任务")
+		return
+	}
+	writeJSON(w, http.StatusOK, importJobSnapshot(job))
+}
+
+func (s *server) streamImportProgress(w http.ResponseWriter, r *http.Request) {
+	job := s.importJob(strings.TrimSpace(r.URL.Query().Get("id")))
+	if job == nil {
+		writeError(w, http.StatusNotFound, "找不到导入任务")
+		return
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "当前服务不支持实时进度")
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	ticker := time.NewTicker(350 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		snapshot := importJobSnapshot(job)
+		payload, _ := json.Marshal(snapshot)
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", payload)
+		flusher.Flush()
+		if finished, _ := snapshot["finished"].(bool); finished {
+			return
+		}
+		select {
+		case <-r.Context().Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func (s *server) cancelImport(w http.ResponseWriter, r *http.Request) {
+	job := s.importJob(strings.TrimSpace(r.URL.Query().Get("id")))
+	if job == nil {
+		writeError(w, http.StatusNotFound, "找不到导入任务")
+		return
+	}
+	job.mu.Lock()
+	if job.Finished {
+		job.mu.Unlock()
+		writeError(w, http.StatusConflict, "导入任务已经结束")
+		return
+	}
+	job.Stage, job.Message = "cancelling", "正在取消导入…"
+	cancel := job.cancel
+	job.mu.Unlock()
+	cancel()
+	writeJSON(w, http.StatusAccepted, map[string]string{"message": "正在取消导入"})
+}
+
+func (s *server) runImport(ctx context.Context, job *importJob) {
+	defer func() { _ = os.Remove(job.InputPath) }()
+	input, err := os.Open(job.InputPath)
+	if err != nil {
+		s.finishImport(job, false, false, "无法打开导入文件: "+err.Error())
+		return
+	}
+	defer input.Close()
+	info, err := input.Stat()
+	if err != nil {
+		s.finishImport(job, false, false, "无法读取导入文件: "+err.Error())
+		return
+	}
+	compressed := strings.HasSuffix(strings.ToLower(job.Filename), ".sql.gz") || strings.HasSuffix(strings.ToLower(job.Filename), ".gz")
+	job.mu.Lock()
+	job.Stage, job.Message, job.TotalBytes, job.ProcessedBytes, job.ProgressEstimated = "importing", "正在连接 MySQL…", info.Size(), 0, compressed
+	job.mu.Unlock()
+	reader := io.Reader(&importProgressReader{reader: input, job: job})
+	if compressed {
+		gzipReader, gzipErr := gzip.NewReader(reader)
+		if gzipErr != nil {
+			s.finishImport(job, false, false, "无法解压 .sql.gz 文件: "+gzipErr.Error())
 			return
 		}
 		defer gzipReader.Close()
@@ -78,34 +404,47 @@ func (s *server) importSQL(w http.ResponseWriter, r *http.Request) {
 	}
 	db, err := s.currentDB()
 	if err != nil {
-		writeError(w, 400, err.Error())
+		s.finishImport(job, false, false, err.Error())
 		return
 	}
-	conn, err := db.Conn(r.Context())
+	conn, err := db.Conn(ctx)
 	if err != nil {
-		writeDBError(w, err)
+		s.finishImport(job, false, ctx.Err() != nil, "无法连接 MySQL: "+err.Error())
 		return
 	}
 	defer conn.Close()
-	if _, err := conn.ExecContext(r.Context(), "USE "+quoteIdentifier(schema)); err != nil {
-		writeDBError(w, err)
+	if _, err := conn.ExecContext(ctx, "USE "+quoteIdentifier(job.Schema)); err != nil {
+		s.finishImport(job, false, ctx.Err() != nil, "无法选择目标数据库: "+err.Error())
 		return
 	}
-	if compatibilityMode {
-		restore, err := enableImportCompatibilityMode(r.Context(), conn)
-		if err != nil {
-			writeDBError(w, err)
+	if job.CompatibilityMode {
+		restore, modeErr := enableImportCompatibilityMode(ctx, conn)
+		if modeErr != nil {
+			s.finishImport(job, false, ctx.Err() != nil, "无法启用兼容导入: "+modeErr.Error())
 			return
 		}
 		defer restore()
-		log.Printf("import compatibility mode enabled: file=%s", header.Filename)
 	}
-	if err := executeSQLScript(r.Context(), conn, reader, schema); err != nil {
-		writeError(w, 500, "导入失败（MySQL 的建库、建表等 DDL 会立即生效，不能自动整体回滚）: "+err.Error())
+	err = executeSQLScript(ctx, newFastImportExecutor(ctx, conn, job), &contextReader{ctx: ctx, reader: reader}, job.Schema)
+	if err != nil {
+		s.finishImport(job, false, ctx.Err() != nil, "导入失败（MySQL 的建库、建表等 DDL 会立即生效，不能自动整体回滚）: "+err.Error())
 		return
 	}
 	s.clearMetadataCache()
-	writeJSON(w, 200, map[string]string{"message": "SQL 已执行完成"})
+	s.finishImport(job, true, false, "导入完成")
+}
+
+func (s *server) finishImport(job *importJob, success, cancelled bool, message string) {
+	job.mu.Lock()
+	defer job.mu.Unlock()
+	job.Finished, job.Success, job.Cancelled = true, success, cancelled
+	if cancelled {
+		job.Stage, job.Message = "cancelled", "导入已取消"
+	} else if success {
+		job.Stage, job.Message, job.ProcessedBytes = "completed", message, job.TotalBytes
+	} else {
+		job.Stage, job.Message = "failed", message
+	}
 }
 
 func enableImportCompatibilityMode(ctx context.Context, conn *sql.Conn) (func(), error) {
@@ -221,7 +560,13 @@ func executeSQLScript(ctx context.Context, executor sqlStatementExecutor, reader
 			return err
 		}
 	}
-	return parser.execute(false)
+	if err := parser.execute(false); err != nil {
+		return err
+	}
+	if flusher, ok := executor.(importBatchFlusher); ok {
+		return flusher.Flush()
+	}
+	return nil
 }
 
 func (p *sqlScriptParser) write(text string) error {
