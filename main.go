@@ -262,7 +262,7 @@ type metadataCache struct {
 }
 
 func main() {
-	addr := flag.String("addr", env("MYSQL_MANAGER_ADDR", "127.0.0.1:8080"), "web listen address")
+	addr := flag.String("addr", env("MYSQL_MANAGER_ADDR", "127.0.0.1:52013"), "web listen address")
 	host := flag.String("mysql-host", env("MYSQL_HOST", ""), "initial MySQL host")
 	port := flag.String("mysql-port", env("MYSQL_PORT", "3306"), "initial MySQL port")
 	user := flag.String("mysql-user", env("MYSQL_USER", "root"), "initial MySQL user")
