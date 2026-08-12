@@ -42,7 +42,10 @@ const noDefaultPasswordMarker = "__MYSQL_MANAGER_NO_DEFAULT_PASSWORD__"
 var identifierPattern = regexp.MustCompile(`^[A-Za-z0-9_$]+$`)
 var sqlCompletionTail = regexp.MustCompile("(?i)([`A-Za-z0-9_$]+)\\s*\\.\\s*([A-Za-z0-9_$]*)$")
 var sqlTableReference = regexp.MustCompile("(?is)\\b(?:from|join)\\s+((?:`[^`]+`|[A-Za-z0-9_$]+)(?:\\s*\\.\\s*(?:`[^`]+`|[A-Za-z0-9_$]+))?)(?:\\s+(?:as\\s+)?([A-Za-z_][A-Za-z0-9_$]*))?")
+var sqlUpdateReference = regexp.MustCompile("(?is)\\bupdate\\s+((?:`[^`]+`|[A-Za-z0-9_$]+)(?:\\s*\\.\\s*(?:`[^`]+`|[A-Za-z0-9_$]+))?)")
 var sqlWordTail = regexp.MustCompile("(?i)([A-Za-z_][A-Za-z0-9_$]*)$")
+var sqlTableContextTail = regexp.MustCompile("(?is)\\b(?:from|join|into|update|table)\\s*$")
+var sqlColumnContextTail = regexp.MustCompile("(?is)(?:\\bselect\\b|\\bwhere\\b|\\band\\b|\\bor\\b|\\bon\\b|\\bhaving\\b|\\bby\\b|,|\\bset\\b)\\s*$")
 var importUseStatement = regexp.MustCompile("(?is)^\\s*USE\\s+(?:`((?:``|[^`])+)`|([A-Za-z0-9_$]+))\\s*$")
 var importDatabaseStatement = regexp.MustCompile("(?is)^(?:\\s*(?:--[^\\n]*(?:\\n|$)|#[^\\n]*(?:\\n|$)|/\\*.*?\\*/))*\\s*(?:CREATE|DROP|ALTER)\\s+(?:DATABASE|SCHEMA)\\b")
 
@@ -338,18 +341,8 @@ func main() {
 }
 
 func openLocalBrowser(localURL string) {
-	// When the default browser is not already running, launching the URL through
-	// the http protocol handler (cmd start / rundll32 url.dll) makes a
-	// cold-started browser open both its configured startup/home page and the
-	// requested local page. For Chromium-based browsers (Edge, Chrome, ...) we
-	// launch the executable directly with --app=<url>, which opens the page in a
-	// standalone window and does not trigger the startup pages.
-	if exe, ok := defaultBrowserExe(); ok && isChromiumBrowser(exe) {
-		if err := exec.Command(exe, "--app="+localURL).Start(); err == nil {
-			return
-		}
-	}
-	// Fallback: let the Windows shell open the URL.
+	// Open the URL in the user's default browser instead of a Chromium --app
+	// standalone window, so it behaves like a normal browser tab.
 	if err := exec.Command("cmd.exe", "/c", "start", "", localURL).Start(); err != nil {
 		log.Printf("could not open browser automatically: %v", err)
 	}
@@ -1847,7 +1840,8 @@ func (s *server) rows(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Cursor paging avoids costly deep OFFSET scans on tables with primary keys.
-	cursorMode := sort == "" && len(meta.PrimaryKeys) > 0
+	// When offset > 0 the client is jumping to a specific page (e.g. last page).
+	cursorMode := sort == "" && len(meta.PrimaryKeys) > 0 && offset == 0
 	if cursorMode {
 		order := make([]string, len(meta.PrimaryKeys))
 		for i, key := range meta.PrimaryKeys {
@@ -2954,7 +2948,12 @@ func (s *server) exportSQLQuery(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "写入导出文件失败: "+err.Error())
 		return
 	}
+	exported := 0
 	for rows.Next() {
+		if exported >= maxSQLExportRows {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("查询结果超过 %d 行，请缩小查询范围后重试", maxSQLExportRows))
+			return
+		}
 		values, refs := make([]any, len(allColumns)), make([]any, len(allColumns))
 		for i := range values {
 			refs[i] = &values[i]
@@ -2971,6 +2970,7 @@ func (s *server) exportSQLQuery(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "写入导出文件失败: "+err.Error())
 			return
 		}
+		exported++
 	}
 	writer.Flush()
 	if err := writer.Error(); err != nil {
@@ -3017,20 +3017,10 @@ func (s *server) sqlComplete(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 200, map[string]any{"suggestions": []completionSuggestion{}})
 			return
 		}
-		rows, err := db.Query(`SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=? AND TABLE_NAME=? AND COLUMN_NAME LIKE ? ORDER BY COLUMN_NAME LIMIT 50`, schema, table, prefix+"%")
+		suggestions, err := querySQLColumnSuggestions(db, schema, table, prefix, qualifier+".")
 		if err != nil {
 			writeDBError(w, err)
 			return
-		}
-		defer rows.Close()
-		suggestions := make([]completionSuggestion, 0)
-		for rows.Next() {
-			var name string
-			if err := rows.Scan(&name); err != nil {
-				writeDBError(w, err)
-				return
-			}
-			suggestions = append(suggestions, completionSuggestion{Value: qualifier + "." + name, Kind: "字段"})
 		}
 		writeJSON(w, 200, map[string]any{"suggestions": suggestions})
 		return
@@ -3041,7 +3031,26 @@ func (s *server) sqlComplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	prefix := match[1]
-	rows, err := db.Query(`SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=? ORDER BY TABLE_NAME LIMIT 500`, request.Schema)
+	sqlBeforeWord := request.SQL[:len(request.SQL)-len(prefix)]
+	tableReferences := collectSQLTableReferences(request.SQL, request.Schema)
+	if sqlExpectsColumnCompletion(sqlBeforeWord) {
+		if len(tableReferences) == 0 {
+			writeJSON(w, 200, map[string]any{"suggestions": []completionSuggestion{}})
+			return
+		}
+		suggestions, err := querySQLColumnsFromReferences(db, tableReferences, prefix, "")
+		if err != nil {
+			writeDBError(w, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"suggestions": suggestions})
+		return
+	}
+	if !sqlExpectsTableCompletion(sqlBeforeWord) {
+		writeJSON(w, 200, map[string]any{"suggestions": sqlKeywordSuggestions(prefix)})
+		return
+	}
+	rows, err := db.Query(`SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=? AND TABLE_NAME LIKE ? ORDER BY TABLE_NAME`, request.Schema, completionLikeRoot(prefix)+"%")
 	if err != nil {
 		writeDBError(w, err)
 		return
@@ -3054,38 +3063,169 @@ func (s *server) sqlComplete(w http.ResponseWriter, r *http.Request) {
 			writeDBError(w, err)
 			return
 		}
-		if tableNameMatchesCompletion(name, prefix) {
+		if identifierMatchesCompletion(name, prefix) {
 			suggestions = append(suggestions, completionSuggestion{Value: name, Kind: "表"})
 		}
 	}
-	for _, keyword := range []string{"SELECT", "FROM", "WHERE", "JOIN", "LEFT JOIN", "RIGHT JOIN", "INNER JOIN", "ON", "GROUP BY", "ORDER BY", "HAVING", "LIMIT", "INSERT INTO", "UPDATE", "DELETE FROM", "CREATE TABLE", "ALTER TABLE", "DROP TABLE", "AS", "AND", "OR", "NOT", "IN", "LIKE", "IS NULL"} {
-		if strings.HasPrefix(strings.ToLower(keyword), strings.ToLower(prefix)) {
-			suggestions = append(suggestions, completionSuggestion{Value: keyword, Kind: "关键字"})
-		}
-	}
+	suggestions = append(suggestions, sqlKeywordSuggestions(prefix)...)
 	sort.Slice(suggestions, func(i, j int) bool {
 		if suggestions[i].Kind != suggestions[j].Kind {
 			return suggestions[i].Kind < suggestions[j].Kind
+		}
+		if suggestions[i].Kind == "表" && suggestions[j].Kind == "表" {
+			li, lj := len(suggestions[i].Value), len(suggestions[j].Value)
+			if li != lj {
+				return li < lj
+			}
 		}
 		return strings.ToLower(suggestions[i].Value) < strings.ToLower(suggestions[j].Value)
 	})
 	writeJSON(w, 200, map[string]any{"suggestions": suggestions})
 }
 
-func tableNameMatchesCompletion(name, prefix string) bool {
-	prefix = strings.ToLower(strings.TrimSpace(prefix))
-	if prefix == "" || strings.HasPrefix(strings.ToLower(name), prefix) {
+func sqlKeywordSuggestions(prefix string) []completionSuggestion {
+	suggestions := make([]completionSuggestion, 0)
+	for _, keyword := range []string{"SELECT", "FROM", "WHERE", "JOIN", "LEFT JOIN", "RIGHT JOIN", "INNER JOIN", "ON", "GROUP BY", "ORDER BY", "HAVING", "LIMIT", "INSERT INTO", "UPDATE", "DELETE FROM", "CREATE TABLE", "ALTER TABLE", "DROP TABLE", "AS", "AND", "OR", "NOT", "IN", "LIKE", "IS NULL"} {
+		if strings.HasPrefix(strings.ToLower(keyword), strings.ToLower(prefix)) {
+			suggestions = append(suggestions, completionSuggestion{Value: keyword, Kind: "关键字"})
+		}
+	}
+	return suggestions
+}
+
+func sqlExpectsTableCompletion(sqlBeforeWord string) bool {
+	trimmed := strings.TrimRight(sqlBeforeWord, " \t\n\r")
+	if trimmed == "" {
 		return true
 	}
+	return sqlTableContextTail.MatchString(trimmed)
+}
+
+func sqlExpectsColumnCompletion(sqlBeforeWord string) bool {
+	trimmed := strings.TrimRight(sqlBeforeWord, " \t\n\r")
+	if trimmed == "" {
+		return false
+	}
+	return sqlColumnContextTail.MatchString(trimmed)
+}
+
+func identifierMatchesCompletion(name, prefix string) bool {
+	name = strings.ToLower(strings.TrimSpace(name))
+	prefix = strings.ToLower(strings.TrimSpace(prefix))
+	if prefix == "" {
+		return true
+	}
+	if strings.HasPrefix(name, prefix) {
+		return true
+	}
+	if !strings.Contains(prefix, "_") && identifierCrossSegmentMatches(name, prefix) {
+		return true
+	}
+	if strings.HasPrefix(identifierInitials(name), prefix) {
+		return true
+	}
+	nameSegments := strings.Split(name, "_")
+	prefixSegments := strings.Split(prefix, "_")
+	if len(prefixSegments) > len(nameSegments) {
+		return false
+	}
+	for index, segment := range prefixSegments {
+		if segment == "" {
+			continue
+		}
+		if !strings.HasPrefix(nameSegments[index], segment) {
+			return false
+		}
+	}
+	return len(prefixSegments) > 0
+}
+
+// identifierCrossSegmentMatches 支持连续输入跨分段字符，如 bde 匹配 biz_devices（b→biz，de→devices）。
+func identifierCrossSegmentMatches(name, prefix string) bool {
+	segments := strings.Split(name, "_")
+	prefixIndex := 0
+	segmentIndex := 0
+	for prefixIndex < len(prefix) && segmentIndex < len(segments) {
+		segment := segments[segmentIndex]
+		segmentOffset := 0
+		for segmentOffset < len(segment) && prefixIndex < len(prefix) && segment[segmentOffset] == prefix[prefixIndex] {
+			segmentOffset++
+			prefixIndex++
+		}
+		if segmentOffset == 0 {
+			return false
+		}
+		segmentIndex++
+	}
+	return prefixIndex == len(prefix)
+}
+
+func identifierInitials(name string) string {
 	initials := make([]rune, 0, len(name))
 	var previous rune
-	for index, current := range []rune(name) {
-		if index == 0 || previous == '_' || previous == '-' || (previous >= 'a' && previous <= 'z' && current >= 'A' && current <= 'Z') {
+	for index, current := range []rune(strings.ToLower(name)) {
+		if index == 0 || previous == '_' || previous == '-' {
 			initials = append(initials, current)
 		}
 		previous = current
 	}
-	return strings.HasPrefix(strings.ToLower(string(initials)), prefix)
+	return string(initials)
+}
+
+func completionLikeRoot(prefix string) string {
+	prefix = strings.ToLower(strings.TrimSpace(prefix))
+	if prefix == "" {
+		return ""
+	}
+	if strings.Contains(prefix, "_") {
+		segment := strings.Split(prefix, "_")[0]
+		if segment != "" {
+			return segment
+		}
+	}
+	return string([]rune(prefix)[0])
+}
+
+func querySQLColumnSuggestions(db *sql.DB, schema, table, prefix, valuePrefix string) ([]completionSuggestion, error) {
+	rows, err := db.Query(`SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=? AND TABLE_NAME=? AND COLUMN_NAME LIKE ? ORDER BY COLUMN_NAME LIMIT 100`, schema, table, completionLikeRoot(prefix)+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	suggestions := make([]completionSuggestion, 0)
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		if !identifierMatchesCompletion(name, prefix) {
+			continue
+		}
+		suggestions = append(suggestions, completionSuggestion{Value: valuePrefix + name, Kind: "字段"})
+	}
+	return suggestions, rows.Err()
+}
+
+func querySQLColumnsFromReferences(db *sql.DB, references map[string][2]string, prefix, valuePrefix string) ([]completionSuggestion, error) {
+	seen := make(map[string]bool)
+	suggestions := make([]completionSuggestion, 0)
+	for _, reference := range references {
+		tableSuggestions, err := querySQLColumnSuggestions(db, reference[0], reference[1], prefix, valuePrefix)
+		if err != nil {
+			return nil, err
+		}
+		for _, suggestion := range tableSuggestions {
+			if seen[suggestion.Value] {
+				continue
+			}
+			seen[suggestion.Value] = true
+			suggestions = append(suggestions, suggestion)
+		}
+	}
+	sort.Slice(suggestions, func(i, j int) bool {
+		return strings.ToLower(suggestions[i].Value) < strings.ToLower(suggestions[j].Value)
+	})
+	return suggestions, nil
 }
 
 func sqlReturnsRows(statement string) bool {
@@ -3119,12 +3259,11 @@ func sqlReturnsRows(statement string) bool {
 
 func cleanSQLIdentifier(value string) string { return strings.Trim(strings.TrimSpace(value), "`") }
 
-func resolveSQLReference(sqlText, defaultSchema, qualifier string) (string, string) {
+func collectSQLTableReferences(sqlText, defaultSchema string) map[string][2]string {
 	reserved := map[string]bool{"where": true, "join": true, "left": true, "right": true, "inner": true, "outer": true, "on": true, "group": true, "order": true, "limit": true, "having": true, "union": true}
 	references := map[string][2]string{}
-	for _, match := range sqlTableReference.FindAllStringSubmatch(sqlText, -1) {
-		reference, alias := strings.TrimSpace(match[1]), strings.ToLower(strings.TrimSpace(match[2]))
-		parts := strings.Split(strings.ReplaceAll(reference, "`", ""), ".")
+	addReference := func(reference, alias string) {
+		parts := strings.Split(strings.ReplaceAll(strings.TrimSpace(reference), "`", ""), ".")
 		schema, table := defaultSchema, ""
 		if len(parts) == 1 {
 			table = parts[0]
@@ -3132,14 +3271,26 @@ func resolveSQLReference(sqlText, defaultSchema, qualifier string) (string, stri
 			schema, table = parts[0], parts[1]
 		}
 		if !identifierPattern.MatchString(schema) || !identifierPattern.MatchString(table) {
-			continue
+			return
 		}
 		pair := [2]string{schema, table}
 		references[strings.ToLower(table)] = pair
+		alias = strings.ToLower(strings.TrimSpace(alias))
 		if alias != "" && !reserved[alias] {
 			references[alias] = pair
 		}
 	}
+	for _, match := range sqlTableReference.FindAllStringSubmatch(sqlText, -1) {
+		addReference(match[1], match[2])
+	}
+	for _, match := range sqlUpdateReference.FindAllStringSubmatch(sqlText, -1) {
+		addReference(match[1], "")
+	}
+	return references
+}
+
+func resolveSQLReference(sqlText, defaultSchema, qualifier string) (string, string) {
+	references := collectSQLTableReferences(sqlText, defaultSchema)
 	if reference, ok := references[strings.ToLower(qualifier)]; ok {
 		return reference[0], reference[1]
 	}

@@ -30,6 +30,7 @@ type backupJob struct {
 	ID         string
 	Schema     string
 	StartedAt  time.Time
+	FinishedAt time.Time
 	Finished   bool
 	Success    bool
 	Message    string
@@ -59,6 +60,7 @@ type importJob struct {
 	TotalBytes         int64
 	ProgressEstimated  bool
 	StatementsExecuted int64
+	FinishedAt         time.Time
 	cancel             context.CancelFunc
 }
 
@@ -101,7 +103,146 @@ func (r *importProgressReader) Read(p []byte) (int, error) {
 const (
 	fastImportBatchStatements = 500
 	fastImportBatchBytes      = 4 << 20
+	tableExportPageSize       = 1000
+	tableExportInsertMaxBytes = 1 << 20
+	importJobTTL              = time.Hour
+	maxSQLExportRows          = 100000
 )
+
+type tableDataExportOptions struct {
+	schema      string
+	table       string
+	filters     string
+	filterArgs  []any
+	orderBy     string
+	primaryKeys []string
+}
+
+type insertBatchWriter struct {
+	w            io.Writer
+	table        string
+	quotedCols   []string
+	jsonColumns  []bool
+	valueRows    []string
+	currentBytes int
+}
+
+func (b *insertBatchWriter) addRow(literals []string) error {
+	row := "(" + strings.Join(literals, ",") + ")"
+	rowBytes := len(row)
+	if len(b.valueRows) > 0 && b.currentBytes+rowBytes+1 > tableExportInsertMaxBytes {
+		if err := b.flush(); err != nil {
+			return err
+		}
+	}
+	b.valueRows = append(b.valueRows, row)
+	b.currentBytes += rowBytes
+	if len(b.valueRows) > 1 {
+		b.currentBytes++
+	}
+	return nil
+}
+
+func (b *insertBatchWriter) flush() error {
+	if len(b.valueRows) == 0 {
+		return nil
+	}
+	_, err := fmt.Fprintf(b.w, "INSERT INTO %s (%s) VALUES %s;\n", quoteIdentifier(b.table), strings.Join(b.quotedCols, ","), strings.Join(b.valueRows, ","))
+	b.valueRows = b.valueRows[:0]
+	b.currentBytes = 0
+	return err
+}
+
+func loadTablePrimaryKeys(tx *sql.Tx, schema, table string) ([]string, error) {
+	rows, err := tx.Query(`SELECT COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA=? AND TABLE_NAME=? AND CONSTRAINT_NAME='PRIMARY' ORDER BY ORDINAL_POSITION`, schema, table)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	keys := make([]string, 0)
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		keys = append(keys, name)
+	}
+	return keys, rows.Err()
+}
+
+func buildTableExportOrderBy(primaryKeys []string) string {
+	if len(primaryKeys) == 0 {
+		return ""
+	}
+	parts := make([]string, len(primaryKeys))
+	for i, key := range primaryKeys {
+		parts[i] = quoteIdentifier(key) + " ASC"
+	}
+	return " ORDER BY " + strings.Join(parts, ",")
+}
+
+func writeTableDataAsInserts(w io.Writer, tx *sql.Tx, opts tableDataExportOptions) error {
+	batch := &insertBatchWriter{w: w, table: opts.table}
+	var offset int64
+	for {
+		pageArgs := append([]any{}, opts.filterArgs...)
+		pageArgs = append(pageArgs, tableExportPageSize, offset)
+		rows, err := tx.Query("SELECT * FROM "+qualify(opts.schema, opts.table)+opts.filters+opts.orderBy+" LIMIT ? OFFSET ?", pageArgs...)
+		if err != nil {
+			return err
+		}
+		colNames, err := rows.Columns()
+		if err == nil && batch.quotedCols == nil {
+			columnTypes, typeErr := rows.ColumnTypes()
+			if typeErr != nil {
+				err = typeErr
+			} else {
+				batch.quotedCols = make([]string, len(colNames))
+				batch.jsonColumns = make([]bool, len(colNames))
+				for i, name := range colNames {
+					batch.quotedCols[i] = quoteIdentifier(name)
+					batch.jsonColumns[i] = strings.EqualFold(columnTypes[i].DatabaseTypeName(), "JSON")
+				}
+			}
+		}
+		if err != nil {
+			_ = rows.Close()
+			return err
+		}
+		batchRows := 0
+		for rows.Next() {
+			values, refs := make([]any, len(colNames)), make([]any, len(colNames))
+			for i := range values {
+				refs[i] = &values[i]
+			}
+			if err := rows.Scan(refs...); err != nil {
+				_ = rows.Close()
+				return err
+			}
+			literals := make([]string, len(values))
+			for i, value := range values {
+				literals[i] = sqlLiteralForColumn(value, batch.jsonColumns[i])
+			}
+			if err := batch.addRow(literals); err != nil {
+				_ = rows.Close()
+				return err
+			}
+			batchRows++
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
+		if batchRows < tableExportPageSize {
+			break
+		}
+		offset += int64(batchRows)
+	}
+	return batch.flush()
+}
 
 type importBatchFlusher interface {
 	Flush() error
@@ -117,10 +258,22 @@ type fastImportExecutor struct {
 	statements []string
 	bytes      int
 	inScriptTx bool
+	maxBatch   int
 }
 
 func newFastImportExecutor(ctx context.Context, conn *sql.Conn, job *importJob) *fastImportExecutor {
-	return &fastImportExecutor{ctx: ctx, conn: conn, job: job, statements: make([]string, 0, fastImportBatchStatements)}
+	maxBatch := fastImportBatchBytes
+	var packetLimit int64
+	if err := conn.QueryRowContext(ctx, "SELECT @@max_allowed_packet").Scan(&packetLimit); err == nil && packetLimit > 0 {
+		safe := int(packetLimit * 3 / 4)
+		if safe < maxBatch {
+			maxBatch = safe
+		}
+	}
+	if maxBatch < 64*1024 {
+		maxBatch = 64 * 1024
+	}
+	return &fastImportExecutor{ctx: ctx, conn: conn, job: job, statements: make([]string, 0, fastImportBatchStatements), maxBatch: maxBatch}
 }
 
 func (e *fastImportExecutor) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
@@ -141,7 +294,7 @@ func (e *fastImportExecutor) ExecContext(ctx context.Context, query string, args
 	}
 	e.statements = append(e.statements, query)
 	e.bytes += len(query)
-	if len(e.statements) >= fastImportBatchStatements || e.bytes >= fastImportBatchBytes {
+	if len(e.statements) >= fastImportBatchStatements || e.bytes >= e.maxBatch {
 		return nil, e.Flush()
 	}
 	return nil, nil
@@ -253,7 +406,7 @@ func (s *server) startImport(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 	lowerName := strings.ToLower(header.Filename)
-	if !strings.HasSuffix(lowerName, ".sql") && !strings.HasSuffix(lowerName, ".sql.gz") && !strings.HasSuffix(lowerName, ".gz") {
+	if !strings.HasSuffix(lowerName, ".sql") && !importFilenameLooksCompressed(header.Filename) {
 		writeError(w, http.StatusBadRequest, "仅支持 .sql 或 .sql.gz 文件")
 		return
 	}
@@ -288,11 +441,13 @@ func (s *server) startImport(w http.ResponseWriter, r *http.Request) {
 		StartedAt:         time.Now(),
 		Stage:             "queued",
 		Message:           fmt.Sprintf("文件已接收（%s），等待导入…", formatImportBytes(copied)),
+		TotalBytes:        copied,
 		cancel:            cancel,
 	}
 	s.importMu.Lock()
 	s.importJobs[job.ID] = job
 	s.importMu.Unlock()
+	s.cleanupTransferJobs()
 	go s.runImport(ctx, job)
 	writeJSON(w, http.StatusAccepted, map[string]string{"id": job.ID})
 }
@@ -383,25 +538,57 @@ func (s *server) runImport(ctx context.Context, job *importJob) {
 		return
 	}
 	defer input.Close()
-	info, err := input.Stat()
+	reader, closeReader, err := openImportSQLReader(job, input)
 	if err != nil {
-		s.finishImport(job, false, false, "无法读取导入文件: "+err.Error())
+		s.finishImport(job, false, false, err.Error())
 		return
 	}
-	compressed := strings.HasSuffix(strings.ToLower(job.Filename), ".sql.gz") || strings.HasSuffix(strings.ToLower(job.Filename), ".gz")
-	job.mu.Lock()
-	job.Stage, job.Message, job.TotalBytes, job.ProcessedBytes, job.ProgressEstimated = "importing", "正在连接 MySQL…", info.Size(), 0, compressed
-	job.mu.Unlock()
-	reader := io.Reader(&importProgressReader{reader: input, job: job})
-	if compressed {
-		gzipReader, gzipErr := gzip.NewReader(reader)
-		if gzipErr != nil {
-			s.finishImport(job, false, false, "无法解压 .sql.gz 文件: "+gzipErr.Error())
-			return
-		}
-		defer gzipReader.Close()
-		reader = gzipReader
+	if closeReader != nil {
+		defer closeReader()
 	}
+	s.runImportFromReader(ctx, job, reader)
+}
+
+func openImportSQLReader(job *importJob, file *os.File) (io.Reader, func(), error) {
+	magic := make([]byte, 2)
+	if _, err := file.Read(magic); err != nil && !errors.Is(err, io.EOF) {
+		return nil, nil, fmt.Errorf("无法读取导入文件: %w", err)
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return nil, nil, fmt.Errorf("无法读取导入文件: %w", err)
+	}
+	progress := &importProgressReader{reader: file, job: job}
+	if isGzipContent(magic) {
+		job.mu.Lock()
+		job.ProgressEstimated = true
+		job.mu.Unlock()
+		gzipReader, err := gzip.NewReader(progress)
+		if err != nil {
+			return nil, nil, fmt.Errorf("无法解压 .sql.gz 文件: %w", err)
+		}
+		return gzipReader, func() { _ = gzipReader.Close() }, nil
+	}
+	if importFilenameLooksCompressed(job.Filename) {
+		return nil, nil, errors.New("无法解压 .sql.gz 文件: 文件内容不是有效的 gzip 格式（请确认文件未损坏，或改用未压缩的 .sql 文件）")
+	}
+	return progress, nil, nil
+}
+
+func isGzipContent(header []byte) bool {
+	return len(header) >= 2 && header[0] == 0x1f && header[1] == 0x8b
+}
+
+func importFilenameLooksCompressed(filename string) bool {
+	lowerName := strings.ToLower(strings.TrimSpace(filename))
+	return strings.HasSuffix(lowerName, ".sql.gz") || strings.HasSuffix(lowerName, ".gz")
+}
+
+func (s *server) runImportFromReader(ctx context.Context, job *importJob, reader io.Reader) {
+	job.mu.Lock()
+	if job.Stage == "queued" {
+		job.Stage, job.Message, job.ProcessedBytes = "importing", "正在连接 MySQL…", 0
+	}
+	job.mu.Unlock()
 	db, err := s.currentDB()
 	if err != nil {
 		s.finishImport(job, false, false, err.Error())
@@ -417,14 +604,12 @@ func (s *server) runImport(ctx context.Context, job *importJob) {
 		s.finishImport(job, false, ctx.Err() != nil, "无法选择目标数据库: "+err.Error())
 		return
 	}
-	if job.CompatibilityMode {
-		restore, modeErr := enableImportCompatibilityMode(ctx, conn)
-		if modeErr != nil {
-			s.finishImport(job, false, ctx.Err() != nil, "无法启用兼容导入: "+modeErr.Error())
-			return
-		}
-		defer restore()
+	restore, sessionErr := enableImportSessionSettings(ctx, conn, job.CompatibilityMode)
+	if sessionErr != nil {
+		s.finishImport(job, false, ctx.Err() != nil, "无法配置导入会话: "+sessionErr.Error())
+		return
 	}
+	defer restore()
 	err = executeSQLScript(ctx, newFastImportExecutor(ctx, conn, job), &contextReader{ctx: ctx, reader: reader}, job.Schema)
 	if err != nil {
 		s.finishImport(job, false, ctx.Err() != nil, "导入失败（MySQL 的建库、建表等 DDL 会立即生效，不能自动整体回滚）: "+err.Error())
@@ -437,39 +622,71 @@ func (s *server) runImport(ctx context.Context, job *importJob) {
 func (s *server) finishImport(job *importJob, success, cancelled bool, message string) {
 	job.mu.Lock()
 	defer job.mu.Unlock()
-	job.Finished, job.Success, job.Cancelled = true, success, cancelled
+	job.Finished, job.Success, job.Cancelled, job.FinishedAt = true, success, cancelled, time.Now()
 	if cancelled {
 		job.Stage, job.Message = "cancelled", "导入已取消"
 	} else if success {
-		job.Stage, job.Message, job.ProcessedBytes = "completed", message, job.TotalBytes
+		job.Stage, job.Message = "completed", message
+		if job.TotalBytes > 0 {
+			job.ProcessedBytes = job.TotalBytes
+		}
 	} else {
 		job.Stage, job.Message = "failed", message
 	}
 }
 
-func enableImportCompatibilityMode(ctx context.Context, conn *sql.Conn) (func(), error) {
-	var original string
-	if err := conn.QueryRowContext(ctx, "SELECT @@SESSION.sql_mode").Scan(&original); err != nil {
+func enableImportSessionSettings(ctx context.Context, conn *sql.Conn, compatibilityMode bool) (func(), error) {
+	var originalSQLMode string
+	if err := conn.QueryRowContext(ctx, "SELECT @@SESSION.sql_mode").Scan(&originalSQLMode); err != nil {
 		return nil, err
 	}
+	var originalForeignKeyChecks int
+	if err := conn.QueryRowContext(ctx, "SELECT @@SESSION.foreign_key_checks").Scan(&originalForeignKeyChecks); err != nil {
+		return nil, err
+	}
+	if _, err := conn.ExecContext(ctx, "SET SESSION foreign_key_checks = 0"); err != nil {
+		return nil, err
+	}
+	if compatibilityMode {
+		compatibilityModeValue := buildImportCompatibilitySQLMode(originalSQLMode)
+		if _, err := conn.ExecContext(ctx, "SET SESSION sql_mode = ?", compatibilityModeValue); err != nil {
+			return nil, err
+		}
+	}
+	return func() {
+		if _, err := conn.ExecContext(context.Background(), "SET SESSION foreign_key_checks = ?", originalForeignKeyChecks); err != nil {
+			log.Printf("failed to restore foreign_key_checks after import: %v", err)
+		}
+		if compatibilityMode {
+			if _, err := conn.ExecContext(context.Background(), "SET SESSION sql_mode = ?", originalSQLMode); err != nil {
+				log.Printf("failed to restore SQL mode after import: %v", err)
+			}
+		}
+	}, nil
+}
+
+func buildImportCompatibilitySQLMode(original string) string {
 	parts := strings.Split(original, ",")
-	filtered := make([]string, 0, len(parts))
+	filtered := make([]string, 0, len(parts)+1)
+	hasAllowInvalidDates := false
 	for _, part := range parts {
 		mode := strings.TrimSpace(part)
-		if strings.EqualFold(mode, "STRICT_TRANS_TABLES") || strings.EqualFold(mode, "STRICT_ALL_TABLES") {
+		if mode == "" {
 			continue
+		}
+		upper := strings.ToUpper(mode)
+		switch upper {
+		case "STRICT_TRANS_TABLES", "STRICT_ALL_TABLES", "NO_ZERO_DATE", "NO_ZERO_IN_DATE":
+			continue
+		case "ALLOW_INVALID_DATES":
+			hasAllowInvalidDates = true
 		}
 		filtered = append(filtered, mode)
 	}
-	compatibilityMode := strings.Join(filtered, ",")
-	if _, err := conn.ExecContext(ctx, "SET SESSION sql_mode = ?", compatibilityMode); err != nil {
-		return nil, err
+	if !hasAllowInvalidDates {
+		filtered = append(filtered, "ALLOW_INVALID_DATES")
 	}
-	return func() {
-		if _, err := conn.ExecContext(context.Background(), "SET SESSION sql_mode = ?", original); err != nil {
-			log.Printf("failed to restore SQL mode after import: %v", err)
-		}
-	}, nil
+	return strings.Join(filtered, ",")
 }
 
 type sqlScriptParser struct {
@@ -478,6 +695,7 @@ type sqlScriptParser struct {
 	targetSchema  string
 	sourceSchema  string
 	delimiter     string
+	delimProgress int
 	statement     strings.Builder
 	quote, closed byte
 	escaped       bool
@@ -496,7 +714,7 @@ func (p *sqlScriptParser) canChangeDelimiter() bool {
 
 func (p *sqlScriptParser) resetStatement() {
 	p.statement.Reset()
-	p.quote, p.closed, p.escaped, p.lineComment, p.blockComment, p.previous = 0, 0, false, false, false, 0
+	p.quote, p.closed, p.escaped, p.lineComment, p.blockComment, p.previous, p.delimProgress = 0, 0, false, false, false, 0, 0
 }
 
 // sqlScriptTriviaOnly reports whether text contains only whitespace and ordinary
@@ -622,9 +840,33 @@ func (p *sqlScriptParser) write(text string) error {
 			continue
 		}
 		p.previous = char
-		if strings.HasSuffix(p.statement.String(), p.delimiter) {
-			if err := p.execute(true); err != nil {
-				return err
+		if err := p.tryDelimiter(char); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *sqlScriptParser) tryDelimiter(char byte) error {
+	if p.quote != 0 || p.lineComment || p.blockComment || p.delimiter == "" {
+		p.delimProgress = 0
+		return nil
+	}
+	if char == p.delimiter[p.delimProgress] {
+		p.delimProgress++
+		if p.delimProgress == len(p.delimiter) {
+			p.delimProgress = 0
+			return p.execute(true)
+		}
+		return nil
+	}
+	if p.delimProgress > 0 {
+		p.delimProgress = 0
+		if char == p.delimiter[0] {
+			p.delimProgress = 1
+			if len(p.delimiter) == 1 {
+				p.delimProgress = 0
+				return p.execute(true)
 			}
 		}
 	}
@@ -638,7 +880,7 @@ func (p *sqlScriptParser) execute(hasDelimiter bool) error {
 	}
 	statement = strings.TrimSpace(statement)
 	p.statement.Reset()
-	p.quote, p.closed, p.escaped, p.lineComment, p.blockComment, p.previous = 0, 0, false, false, false, 0
+	p.quote, p.closed, p.escaped, p.lineComment, p.blockComment, p.previous, p.delimProgress = 0, 0, false, false, false, 0, 0
 	if statement == "" {
 		return nil
 	}
@@ -737,84 +979,18 @@ func (s *server) exportSQL(w http.ResponseWriter, r *http.Request) {
 		writeDBError(w, err)
 		return
 	}
-	if _, err := fmt.Fprintf(file, "-- Exported by MySQL Manager at %s\n-- Native logical export: structure from SHOW CREATE TABLE, data in 1000-row pages\n\n/*!40101 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;\n/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;\n\nDROP TABLE IF EXISTS %s;\n%s;\n\n", time.Now().Format(time.RFC3339), quoteIdentifier(table), strings.TrimSuffix(createSQL, ";")); err != nil {
+	if _, err := fmt.Fprintf(file, "-- Exported by MySQL Manager at %s\n-- Native logical export: structure from SHOW CREATE TABLE, data in %d-row pages with multi-value INSERT\n\n/*!40101 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;\n/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;\n\nDROP TABLE IF EXISTS %s;\n%s;\n\n", time.Now().Format(time.RFC3339), tableExportPageSize, quoteIdentifier(table), strings.TrimSuffix(createSQL, ";")); err != nil {
 		writeError(w, http.StatusInternalServerError, "写入导出文件失败: "+err.Error())
 		return
 	}
 	if includeData {
-		const batchSize = 1000
-		var offset int64
-		orderBy := ""
-		if len(meta.PrimaryKeys) > 0 {
-			keys := make([]string, len(meta.PrimaryKeys))
-			for i, key := range meta.PrimaryKeys {
-				keys[i] = quoteIdentifier(key) + " ASC"
-			}
-			orderBy = " ORDER BY " + strings.Join(keys, ",")
+		orderBy := buildTableExportOrderBy(meta.PrimaryKeys)
+		if orderBy == "" && filters == "" {
+			log.Printf("export warning: table %s.%s has no primary key; export may be slow on large tables", schema, table)
 		}
-		var quotedNames []string
-		var jsonColumns []bool
-		for {
-			pageArgs := append([]any{}, args...)
-			pageArgs = append(pageArgs, batchSize, offset)
-			rows, err := tx.Query("SELECT * FROM "+qualify(schema, table)+filters+orderBy+" LIMIT ? OFFSET ?", pageArgs...)
-			if err != nil {
-				writeDBError(w, err)
-				return
-			}
-			colNames, err := rows.Columns()
-			if err == nil && quotedNames == nil {
-				columnTypes, typeErr := rows.ColumnTypes()
-				if typeErr != nil {
-					err = typeErr
-				} else {
-					quotedNames, jsonColumns = make([]string, len(colNames)), make([]bool, len(colNames))
-					for i, name := range colNames {
-						quotedNames[i] = quoteIdentifier(name)
-						jsonColumns[i] = strings.EqualFold(columnTypes[i].DatabaseTypeName(), "JSON")
-					}
-				}
-			}
-			if err != nil {
-				_ = rows.Close()
-				writeDBError(w, err)
-				return
-			}
-			batchRows := 0
-			for rows.Next() {
-				values, refs := make([]any, len(colNames)), make([]any, len(colNames))
-				for i := range values {
-					refs[i] = &values[i]
-				}
-				if err := rows.Scan(refs...); err != nil {
-					_ = rows.Close()
-					writeDBError(w, err)
-					return
-				}
-				literals := make([]string, len(values))
-				for i, value := range values {
-					literals[i] = sqlLiteralForColumn(value, jsonColumns[i])
-				}
-				if _, err := fmt.Fprintf(file, "INSERT INTO %s (%s) VALUES (%s);\n", quoteIdentifier(table), strings.Join(quotedNames, ","), strings.Join(literals, ",")); err != nil {
-					_ = rows.Close()
-					writeError(w, http.StatusInternalServerError, "写入导出文件失败: "+err.Error())
-					return
-				}
-				batchRows++
-			}
-			if err := rows.Err(); err != nil {
-				_ = rows.Close()
-				writeDBError(w, err)
-				return
-			}
-			if err := rows.Close(); err != nil {
-				writeDBError(w, err)
-				return
-			}
-			if batchRows < batchSize {
-				break
-			}
-			offset += int64(batchRows)
+		if err := writeTableDataAsInserts(file, tx, tableDataExportOptions{schema: schema, table: table, filters: filters, filterArgs: args, orderBy: orderBy, primaryKeys: meta.PrimaryKeys}); err != nil {
+			writeDBError(w, err)
+			return
 		}
 	}
 	if _, err := fmt.Fprint(file, "\n/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;\n/*!40101 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;\n"); err != nil {
@@ -857,6 +1033,7 @@ func (s *server) backup(w http.ResponseWriter, r *http.Request) {
 		s.backupMu.Lock()
 		s.backupJobs[job.ID] = job
 		s.backupMu.Unlock()
+		s.cleanupTransferJobs()
 		go s.runBackup(job, db)
 		writeJSON(w, http.StatusAccepted, map[string]string{"id": job.ID})
 	case http.MethodGet:
@@ -1027,49 +1204,15 @@ func dumpTableSQL(tx *sql.Tx, schema, table string, writer *bufio.Writer) error 
 	if _, err := fmt.Fprintf(writer, "DROP TABLE IF EXISTS %s;\n%s;\n", qualify(schema, table), strings.TrimSuffix(createSQL, ";")); err != nil {
 		return err
 	}
-	rows, err := tx.Query("SELECT * FROM " + qualify(schema, table))
+	primaryKeys, err := loadTablePrimaryKeys(tx, schema, table)
 	if err != nil {
 		return err
 	}
-	columns, err := rows.Columns()
-	if err != nil {
-		rows.Close()
-		return err
+	orderBy := buildTableExportOrderBy(primaryKeys)
+	if orderBy == "" {
+		log.Printf("backup warning: table %s.%s has no primary key; backup may be slow on large tables", schema, table)
 	}
-	columnTypes, err := rows.ColumnTypes()
-	if err != nil {
-		rows.Close()
-		return err
-	}
-	quoted := make([]string, len(columns))
-	jsonColumns := make([]bool, len(columns))
-	for index, column := range columns {
-		quoted[index] = quoteIdentifier(column)
-		jsonColumns[index] = strings.EqualFold(columnTypes[index].DatabaseTypeName(), "JSON")
-	}
-	for rows.Next() {
-		values, refs := make([]any, len(columns)), make([]any, len(columns))
-		for index := range values {
-			refs[index] = &values[index]
-		}
-		if err := rows.Scan(refs...); err != nil {
-			rows.Close()
-			return err
-		}
-		literals := make([]string, len(values))
-		for index, value := range values {
-			literals[index] = sqlLiteralForColumn(value, jsonColumns[index])
-		}
-		if _, err := fmt.Fprintf(writer, "INSERT INTO %s (%s) VALUES (%s);\n", quoteIdentifier(table), strings.Join(quoted, ","), strings.Join(literals, ",")); err != nil {
-			rows.Close()
-			return err
-		}
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return err
-	}
-	if err := rows.Close(); err != nil {
+	if err := writeTableDataAsInserts(writer, tx, tableDataExportOptions{schema: schema, table: table, orderBy: orderBy, primaryKeys: primaryKeys}); err != nil {
 		return err
 	}
 	_, err = writer.WriteString("\n")
@@ -1184,13 +1327,33 @@ func dumpDatabaseProgrammables(tx *sql.Tx, schema string, writer *bufio.Writer) 
 	return nil
 }
 
-func backupDirectory() (string, error) {
-	return os.MkdirTemp("", "mysql-manage-backup-")
+func (s *server) cleanupTransferJobs() {
+	cutoff := time.Now().Add(-importJobTTL)
+	s.importMu.Lock()
+	for id, job := range s.importJobs {
+		job.mu.RLock()
+		expired := job.Finished && !job.FinishedAt.IsZero() && job.FinishedAt.Before(cutoff)
+		job.mu.RUnlock()
+		if expired {
+			delete(s.importJobs, id)
+		}
+	}
+	s.importMu.Unlock()
+	s.backupMu.Lock()
+	for id, job := range s.backupJobs {
+		job.mu.RLock()
+		expired := job.Finished && !job.FinishedAt.IsZero() && job.FinishedAt.Before(cutoff)
+		job.mu.RUnlock()
+		if expired {
+			delete(s.backupJobs, id)
+		}
+	}
+	s.backupMu.Unlock()
 }
 
 func (s *server) finishBackup(job *backupJob, success bool, message, path string) {
 	job.mu.Lock()
-	job.Finished, job.Success, job.Message, job.Path = true, success, message, path
+	job.Finished, job.Success, job.Message, job.Path, job.FinishedAt = true, success, message, path, time.Now()
 	if success {
 		job.TablesDone = job.TableTotal
 	}
